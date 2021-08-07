@@ -47,6 +47,8 @@ class MainWindow : public QMainWindow
 		DisplayServer *DisplayServerFromSender();
 		void SendWakeup(const DisplayServer *server);
 
+		bool retropie_connected = 0;
+
 	private slots:
 		void ServerItemWidgetSelected();
 		void ServerItemWidgetTriggered();

@@ -102,6 +102,10 @@ int real_main(int argc, char *argv[])
 	QCommandLineOption fullscreen_option("fullscreen", "Start window in fullscreen (only for use with stream command)");
 	parser.addOption(fullscreen_option);
 
+	//Retropie
+	QCommandLineOption retropie_option("retropie", "Autostarts PS Server[0], R3+Moon to Quit.");
+	parser.addOption(retropie_option);
+
 	parser.process(app);
 	QStringList args = parser.positionalArguments();
 

@@ -356,6 +356,27 @@ void MainWindow::UpdateServerWidgets()
 		grid_widget->AddWidget(widget);
 	}
 
-	for(size_t i=0; i<server_item_widgets.count(); i++)
+	for(size_t i=0; i<server_item_widgets.count(); i++){
+
 		server_item_widgets[i]->Update(display_servers[i]);
+
+		// temp fix for Retropie only
+		if(QCoreApplication::arguments().contains("--retropie"))
+		{
+			printf("In RetroPie Mode\n");
+			if(i==0)
+			{
+				if(retropie_connected == 0 && server_item_widgets[0]->GetState() == CHIAKI_DISCOVERY_HOST_STATE_READY) {
+					printf("Auto starting Session\n");
+					sleep(1);
+					server_item_widgets[0]->Triggered();
+					retropie_connected = 1;
+				}
+				else {
+					printf("Triggering wakeup\n");
+					server_item_widgets[0]->WakeTriggered();
+				}
+			}
+		}
+	}
 }
