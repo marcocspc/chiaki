@@ -97,6 +97,9 @@ class Settings : public QObject
 		unsigned int GetAudioBufferSize() const;
 		void SetAudioBufferSize(unsigned int size);
 		
+		QString GetRemapFile() const;
+		void SetRemapFile(QString remap_file);
+			
 		QString GetAudioOutDevice() const;
 		void SetAudioOutDevice(QString device_name);
 

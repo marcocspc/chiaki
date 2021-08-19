@@ -102,3 +102,8 @@ install(TARGETS chiaki
 install(FILES chiaki.desktop DESTINATION share/applications)
 install(FILES chiaki.png DESTINATION share/icons/hicolor/512x512/apps)
 install(FILES re.chiaki.Chiaki.appdata.xml DESTINATION share/metainfo)
+
+# Adding resource file with SDL2 controller mapping info.
+add_custom_command(TARGET chiaki PRE_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E
+                   copy ${CMAKE_SOURCE_DIR}/gui/example_mappingfile.txt ${CMAKE_CURRENT_BINARY_DIR})

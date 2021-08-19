@@ -72,6 +72,20 @@ SettingsDialog::SettingsDialog(Settings *settings, QWidget *parent) : QDialog(pa
 	auto log_directory_label = new QLineEdit(GetLogBaseDir(), this);
 	log_directory_label->setReadOnly(true);
 	general_layout->addRow(tr("Log Directory:"), log_directory_label);
+	
+	remap_file_edit = new QLineEdit(this);
+	QString remap_file = settings->GetRemapFile();
+	remap_file_edit->setText(!remap_file.isEmpty() ? remap_file : "example_mappingfile.txt");
+	general_layout->addRow(tr("Remap File:"), remap_file_edit);
+	remap_file_edit->setPlaceholderText(tr("example_mappingfile.txt").arg(settings->GetRemapFile()));
+	connect(remap_file_edit, &QLineEdit::textEdited, this, &SettingsDialog::MappingFileEdited);
+	//~ audio_buffer_size_edit = new QLineEdit(this);
+	//~ audio_buffer_size_edit->setValidator(new QIntValidator(1024, 0x20000, audio_buffer_size_edit));
+	//~ unsigned int audio_buffer_size = settings->GetAudioBufferSizeRaw();
+	//~ audio_buffer_size_edit->setText(audio_buffer_size ? QString::number(audio_buffer_size) : "");
+	//~ stream_settings_layout->addRow(tr("Audio Buffer Size:"), audio_buffer_size_edit);
+	//~ audio_buffer_size_edit->setPlaceholderText(tr("Default (%1)").arg(settings->GetAudioBufferSizeDefault()));
+	//~ connect(audio_buffer_size_edit, &QLineEdit::textEdited, this, &SettingsDialog::AudioBufferSizeEdited);
 
 	disconnect_action_combo_box = new QComboBox(this);
 	QList<QPair<DisconnectAction, const char *>> disconnect_action_strings = {
@@ -340,6 +354,11 @@ void SettingsDialog::CodecSelected()
 void SettingsDialog::AudioBufferSizeEdited()
 {
 	settings->SetAudioBufferSize(audio_buffer_size_edit->text().toUInt());
+}
+
+void SettingsDialog::MappingFileEdited()
+{
+	settings->SetRemapFile(remap_file_edit->text());
 }
 
 void SettingsDialog::AudioOutputSelected()

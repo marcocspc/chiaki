@@ -26,6 +26,7 @@ class SettingsDialog : public QDialog
 		QLineEdit *bitrate_edit;
 		QComboBox *codec_combo_box;
 		QLineEdit *audio_buffer_size_edit;
+		QLineEdit *remap_file_edit;
 		QComboBox *audio_device_combo_box;
 		QCheckBox *pi_decoder_check_box;
 		QComboBox *hw_decoder_combo_box;
@@ -44,6 +45,7 @@ class SettingsDialog : public QDialog
 		void BitrateEdited();
 		void CodecSelected();
 		void AudioBufferSizeEdited();
+		void MappingFileEdited();
 		void AudioOutputSelected();
 		void HardwareDecodeEngineSelected();
 		void UpdateHardwareDecodeEngineComboBox();

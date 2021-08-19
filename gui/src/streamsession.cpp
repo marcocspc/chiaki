@@ -24,6 +24,7 @@ StreamSessionConnectInfo::StreamSessionConnectInfo(Settings *settings, ChiakiTar
 	audio_out_device = settings->GetAudioOutDevice();
 	log_level_mask = settings->GetLogLevelMask();
 	log_file = CreateLogFilename();
+	remap_file = settings->GetRemapFile();
 	video_profile = settings->GetVideoProfile();
 	this->target = target;
 	this->host = host;
@@ -152,6 +153,11 @@ StreamSession::StreamSession(const StreamSessionConnectInfo &connect_info, QObje
 
 #if CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
 	connect(ControllerManager::GetInstance(), &ControllerManager::AvailableControllersUpdated, this, &StreamSession::UpdateGamepads);
+	
+	QByteArray remap_ba = connect_info.remap_file.toLocal8Bit();
+	const char *remap_cstr = remap_ba.data();
+	SDL_GameControllerAddMappingsFromFile(remap_cstr);
+	printf("Attempted mapfile load: %s", remap_cstr);
 #endif
 
 #if CHIAKI_GUI_ENABLE_SETSU

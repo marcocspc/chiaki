@@ -163,6 +163,17 @@ unsigned int Settings::GetAudioBufferSizeRaw() const
 	return settings.value("settings/audio_buffer_size", 0).toUInt();
 }
 
+QString Settings::GetRemapFile() const
+{
+	return settings.value("settings/remap_file", "example_mappingfile.txt").toString();
+}
+
+void Settings::SetRemapFile(QString remap_file)
+{
+	settings.setValue("settings/remap_file", remap_file);
+}
+
+
 static const QMap<Decoder, QString> decoder_values = {
 	{ Decoder::Ffmpeg, "ffmpeg" },
 	{ Decoder::Pi, "pi" }

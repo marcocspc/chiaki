@@ -11,6 +11,7 @@
 #include <SDL.h>
 #endif
 
+// https://github.com/gabomdq/SDL_GameControllerDB
 static QSet<QString> chiaki_motion_controller_guids({
 	// Sony on Linux
 	"03000000341a00003608000011010000",
@@ -39,6 +40,8 @@ static QSet<QString> chiaki_motion_controller_guids({
 	"050000004c050000cc09000000010000",
 	"050000004c050000cc09000000810000",
 	"050000004c050000cc09000001800000",
+	"030000004c050000e60c000011010000",
+	"050000004c050000e60c000000010000"
 	// Sony on iOS
 	"050000004c050000cc090000df070000",
 	// Sony on Android
