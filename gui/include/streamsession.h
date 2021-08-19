@@ -46,6 +46,7 @@ struct StreamSessionConnectInfo
 	QString audio_out_device;
 	uint32_t log_level_mask;
 	QString log_file;
+	QString remap_file;
 	ChiakiTarget target;
 	QString host;
 	QByteArray regist_key;
