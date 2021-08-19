@@ -157,7 +157,7 @@ StreamSession::StreamSession(const StreamSessionConnectInfo &connect_info, QObje
 	QByteArray remap_ba = connect_info.remap_file.toLocal8Bit();
 	const char *remap_cstr = remap_ba.data();
 	SDL_GameControllerAddMappingsFromFile(remap_cstr);
-	printf("Attempted mapfile load: %s", remap_cstr);
+	printf("Attempted mapfile load: %s\n", remap_cstr);
 #endif
 
 #if CHIAKI_GUI_ENABLE_SETSU
