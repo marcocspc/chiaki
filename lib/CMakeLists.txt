@@ -78,7 +78,9 @@ set(SOURCE_FILES
 		src/orientation.c)
 
 if(CHIAKI_ENABLE_FFMPEG_DECODER)
-	list(APPEND HEADER_FILES include/chiaki/ffmpegdecoder.h)
+	#message("${FFMPEG_INCLUDE_DIRS}")
+	include_directories("${FFMPEG_INCLUDE_DIRS}") #fred
+	list(APPEND HEADER_FILES include/chiaki/ffmpegdecoder.h /home/pi/dev/rpi-ffmpeg/out/armv7-buster-static-rel/install/include/arm-linux-gnueabihf/libavutil/pixfmt.h)
 	list(APPEND SOURCE_FILES src/ffmpegdecoder.c)
 endif()
 set(CHIAKI_LIB_ENABLE_PI_DECODER "${CHIAKI_ENABLE_FFMPEG_DECODER}")
@@ -136,7 +138,8 @@ target_link_libraries(chiaki-lib Nanopb::nanopb)
 target_link_libraries(chiaki-lib Jerasure::Jerasure)
 
 if(CHIAKI_ENABLE_FFMPEG_DECODER)
-	target_link_libraries(chiaki-lib FFMPEG::avcodec FFMPEG::avutil)
+	#target_link_libraries(chiaki-lib FFMPEG::avcodec FFMPEG::avutil)
+	target_link_libraries(chiaki-lib ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY})
 endif()
 
 if(CHIAKI_ENABLE_PI_DECODER)

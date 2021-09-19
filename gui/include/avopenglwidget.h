@@ -44,6 +44,7 @@ struct AVOpenGLFrame
 	unsigned int width;
 	unsigned int height;
 	ConversionConfig *conversion_config;
+	GLuint new_texture;//fred
 
 	bool Update(AVFrame *frame, ChiakiLog *log);
 };

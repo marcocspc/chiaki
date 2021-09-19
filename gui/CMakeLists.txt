@@ -61,6 +61,7 @@ add_executable(chiaki WIN32
 		src/controllermanager.cpp
 		include/loginpindialog.h
 		src/loginpindialog.cpp)
+		
 target_include_directories(chiaki PRIVATE include)
 
 target_link_libraries(chiaki chiaki-lib)
@@ -85,6 +86,16 @@ endif()
 if(NOT CHIAKI_ENABLE_FFMPEG_DECODER)
 	message(FATAL_ERROR "Chiaki GUI requires CHIAKI_ENABLE_FFMPEG_DECODER=ON")
 endif()
+#fred
+if(CHIAKI_ENABLE_FFMPEG_DECODER)
+	#message("${FFMPEG_INCLUDE_DIRS}")
+	include_directories("${FFMPEG_INCLUDE_DIRS}") #fred
+	list(APPEND HEADER_FILES include/chiaki/ffmpegdecoder.h /home/pi/dev/rpi-ffmpeg/out/armv7-buster-static-rel/install/include/arm-linux-gnueabihf/libavutil/pixfmt.h)
+	list(APPEND SOURCE_FILES src/ffmpegdecoder.c)
+endif()
+#fred
+#list(APPEND HEADER_FILES /home/pi/dev/rpi-ffmpeg/out/armv7-buster-static-rel/install/include/arm-linux-gnueabihf/libavutil/pixfmt.h)
+target_link_libraries(chiaki -lGLESv2 -lEGL)
 
 set_target_properties(chiaki PROPERTIES
 		MACOSX_BUNDLE TRUE

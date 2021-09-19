@@ -15,8 +15,44 @@
 
 //#define DEBUG_OPENGL
 
+// video file decode - fred - clean up later!
+///home/pi/dev/rpi-ffmpeg/out/armv7-buster-static-rel/install/include/arm-linux-gnueabihf/libavutil/pixfmt.h
+#include "libavutil/pixfmt.h"
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/pixdesc.h>
+#include <libavutil/hwcontext.h>
+#include <libavutil/opt.h>
+#include <libavutil/avassert.h>
+#include <libavutil/imgutils.h>
+
+#include "libavutil/hwcontext_drm.h"
+//fred
+//#include <EGL/egl.h>
+//#include <EGL/eglext.h>
+//#include <GLES2/gl2ext.h>
+#include "glhelp.h"
+
+static EGLint texgen_attrs[] = {
+   EGL_DMA_BUF_PLANE0_FD_EXT,
+   EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+   EGL_DMA_BUF_PLANE0_PITCH_EXT,
+   EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
+   EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT,
+   EGL_DMA_BUF_PLANE1_FD_EXT,
+   EGL_DMA_BUF_PLANE1_OFFSET_EXT,
+   EGL_DMA_BUF_PLANE1_PITCH_EXT,
+   EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT,
+   EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT,
+   EGL_DMA_BUF_PLANE2_FD_EXT,
+   EGL_DMA_BUF_PLANE2_OFFSET_EXT,
+   EGL_DMA_BUF_PLANE2_PITCH_EXT,
+   EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT,
+   EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT,
+};
+
 static const char *shader_vert_glsl = R"glsl(
-#version 150 core
+#version 300 es
 
 in vec2 pos_attr;
 
@@ -29,12 +65,26 @@ void main()
 }
 )glsl";
 
-static const char *yuv420p_shader_frag_glsl = R"glsl(
-#version 150 core
+static const GLchar* fragment_shader_source =
+	"#version 300 es\n"
+	"#extension GL_OES_EGL_image_external : require\n"
+	"precision mediump float;\n"
+	"uniform samplerExternalOES plane1;\n"
+	"in vec2 uv_var;\n"
+	"out vec4 out_color;\n"
+	"void main() {	\n"
+	"	out_color = texture2D( plane1, uv_var );\n"
+	"}\n";
 
-uniform sampler2D plane1; // Y
-uniform sampler2D plane2; // U
-uniform sampler2D plane3; // V
+
+static const char *yuv420p_shader_frag_glsl_NEW = R"glsl(
+#version 300 es
+#extension GL_OES_EGL_image_external : require
+precision mediump float;
+
+uniform samplerExternalOES plane1; // Y
+uniform samplerExternalOES plane2; // U
+uniform samplerExternalOES plane3; // V
 
 in vec2 uv_var;
 out vec4 out_color;
@@ -42,22 +92,51 @@ out vec4 out_color;
 void main()
 {
 	vec3 yuv = vec3(
-		(texture(plane1, uv_var).r - (16.0 / 255.0)) / ((235.0 - 16.0) / 255.0),
-		(texture(plane2, uv_var).r - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5,
-		(texture(plane3, uv_var).r - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5);
+		(texture2D(plane1, uv_var).r - (16.0 / 255.0)) / ((235.0 - 16.0) / 255.0),
+		(texture2D(plane2, uv_var).r - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5,
+		(texture2D(plane3, uv_var).r - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5);
 	vec3 rgb = mat3(
 		1.0,		1.0,		1.0,
 		0.0,		-0.21482,	2.12798,
 		1.28033,	-0.38059,	0.0) * yuv;
 	out_color = vec4(rgb, 1.0);
+)glsl";
+
+static const char *yuv420p_shader_frag_glsl = R"glsl(
+#version 300 es
+#extension GL_OES_EGL_image_external : require
+precision mediump float;
+
+uniform samplerExternalOES plane1; // Y
+uniform samplerExternalOES plane2; // U
+uniform samplerExternalOES plane3; // V
+
+in vec2 uv_var;
+out vec4 out_color;
+
+void main()
+{
+	vec3 yuv = vec3(
+		(texture2D(plane1, uv_var).r - (16.0 / 255.0)) / ((235.0 - 16.0) / 255.0),
+		(texture2D(plane2, uv_var).r - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5,
+		(texture2D(plane3, uv_var).r - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5);
+	//~ vec3 rgb = mat3(
+		//~ 1.0,		1.0,		1.0,
+		//~ 0.0,		-0.21482,	2.12798,
+		//~ 1.28033,	-0.38059,	0.0) * yuv;
+	//out_color = vec4(rgb, 1.0);
+	out_color = vec4(yuv, 1.0);
 }
 )glsl";
 
 static const char *nv12_shader_frag_glsl = R"glsl(
-#version 150 core
+#version 300 es
+#extension GL_OES_EGL_image_external : require
+precision mediump float;
 
-uniform sampler2D plane1; // Y
-uniform sampler2D plane2; // interlaced UV
+//uniform sampler2D plane1; // Y
+uniform samplerExternalOES plane1;
+uniform samplerExternalOES plane2; // interlaced UV
 
 in vec2 uv_var;
 
@@ -66,9 +145,10 @@ out vec4 out_color;
 void main()
 {
 	vec3 yuv = vec3(
-		(texture(plane1, uv_var).r - (16.0 / 255.0)) / ((235.0 - 16.0) / 255.0),
-		(texture(plane2, uv_var).r - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5,
-		(texture(plane2, uv_var).g - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5
+		texture2D(plane1, uv_var));
+		//(texture2D(plane1, uv_var).r - (16.0 / 255.0)) / ((235.0 - 16.0) / 255.0),
+		//(texture2D(plane2, uv_var).r - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5,
+		//(texture2D(plane2, uv_var).g - (16.0 / 255.0)) / ((240.0 - 16.0) / 255.0) - 0.5
 	);
 	vec3 rgb = mat3(
 		1.0,		1.0,		1.0,
@@ -78,7 +158,17 @@ void main()
 }
 )glsl";
 
+//fred added
 ConversionConfig conversion_configs[] = {
+	{
+		AV_PIX_FMT_DRM_PRIME,
+		shader_vert_glsl,
+		fragment_shader_source,
+		1,
+		{
+			{ 1, 1, 1, GL_R8, GL_RED }// TODO
+		}
+	},	
 	{
 		AV_PIX_FMT_YUV420P,
 		shader_vert_glsl,
@@ -111,11 +201,13 @@ static const float vert_pos[] = {
 
 QSurfaceFormat AVOpenGLWidget::CreateSurfaceFormat()
 {
-	QSurfaceFormat format;
+	QSurfaceFormat format;  // We want:  GL_VERSION  : OpenGL ES 3.1 Mesa 21.3.0-devel (git-c679dbe09c)
 	format.setDepthBufferSize(0);
 	format.setStencilBufferSize(0);
-	format.setVersion(3, 2);
+	format.setVersion(3, 1);//was: 3,2
+	format.setRenderableType(QSurfaceFormat::OpenGLES);//added
 	format.setProfile(QSurfaceFormat::CoreProfile);
+	format.setSwapBehavior(QSurfaceFormat::SingleBuffer);//added,  QSurfaceFormat::DefaultSwapBehavior
 #ifdef DEBUG_OPENGL
 	format.setOption(QSurfaceFormat::DebugContext, true);
 #endif
@@ -127,12 +219,14 @@ AVOpenGLWidget::AVOpenGLWidget(StreamSession *session, QWidget *parent)
 	session(session)
 {
 	enum AVPixelFormat pixel_format = chiaki_ffmpeg_decoder_get_pixel_format(session->GetFfmpegDecoder());
+	pixel_format = AV_PIX_FMT_DRM_PRIME;//new
 	conversion_config = nullptr;
 	for(auto &cc : conversion_configs)
 	{
 		if(pixel_format == cc.pixel_format)
 		{
 			conversion_config = &cc;
+			printf("AVOpenGLWidget - Found Matching ConvConf\n");
 			break;
 		}
 	}
@@ -190,62 +284,107 @@ void AVOpenGLWidget::SwapFrames()
 	QMetaObject::invokeMethod(this, "update");
 }
 
-bool AVOpenGLFrame::Update(AVFrame *frame, ChiakiLog *log)
-{
-	auto f = QOpenGLContext::currentContext()->extraFunctions();
 
-	if(frame->format != conversion_config->pixel_format)
-	{
-		CHIAKI_LOGE(log, "AVOpenGLFrame got AVFrame with invalid format");
+// Refresh/swap Texture Here!!??
+// *frame == return of chiaki_ffmpeg_decoder_pull_frame
+//
+bool AVOpenGLFrame::Update(AVFrame *frame, ChiakiLog *log)
+{	
+	//printf("\nBEGIN AVOpenGLFrame::Update\n");
+	//auto f = QOpenGLContext::currentContext()->extraFunctions();
+	//printf("PIX Format in Update():  %d\n", frame->format); // 181 is the one!
+	//printf("DRM_PRIME as int in Update(): %d\n", AV_PIX_FMT_DRM_PRIME); //prints 182
+	
+	if(frame->format != AV_PIX_FMT_DRM_PRIME)
+	{	
+		printf("Inside Check.  Ie not a AV_PIX_FMT_DRM_PRIME Frame\n");
 		return false;
 	}
-
+	
+	//needed for aspect ratio fitting
 	width = frame->width;
 	height = frame->height;
 
-	for(int i=0; i<conversion_config->planes; i++)
-	{
-		int width = frame->width / conversion_config->plane_configs[i].width_divider;
-		int height = frame->height / conversion_config->plane_configs[i].height_divider;
-		int size = width * height * conversion_config->plane_configs[i].data_per_pixel;
+	
+	
+	/// My one
+	const AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
+	int fd = -1;
+	fd = desc->objects[0].fd;
+	//printf("FD: %d\n", fd);
+	GLuint texture = 1;
 
-		f->glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[i]);
-		f->glBufferData(GL_PIXEL_UNPACK_BUFFER, size, nullptr, GL_STREAM_DRAW);
+	EGLint attribs[50];
+	EGLint *a = attribs;
+	const EGLint *b = texgen_attrs;
+	
+	*a++ = EGL_WIDTH;
+	*a++ = av_frame_cropped_width(frame);
+	*a++ = EGL_HEIGHT;
+	*a++ = av_frame_cropped_height(frame);
+	*a++ = EGL_LINUX_DRM_FOURCC_EXT;
+	*a++ = desc->layers[0].format;
 
-		auto buf = reinterpret_cast<uint8_t *>(f->glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
-		if(!buf)
-		{
-			CHIAKI_LOGE(log, "AVOpenGLFrame failed to map PBO");
-			continue;
-		}
+	int i, j;
+	for (i = 0; i < desc->nb_layers; ++i) {
+            for (j = 0; j < desc->layers[i].nb_planes; ++j) {
+                const AVDRMPlaneDescriptor * const p = desc->layers[i].planes + j;
+                const AVDRMObjectDescriptor * const obj = desc->objects + p->object_index;
+                *a++ = *b++;
+                *a++ = obj->fd;
+                *a++ = *b++;
+                *a++ = p->offset;
+                *a++ = *b++;
+                *a++ = p->pitch;
+                if (obj->format_modifier == 0) {
+                   b += 2;
+                }
+                else {
+                   *a++ = *b++;
+                   *a++ = (EGLint)(obj->format_modifier & 0xFFFFFFFF);
+                   *a++ = *b++;
+                   *a++ = (EGLint)(obj->format_modifier >> 32);
+                }
+            }
+     }
+	
+	 *a = EGL_NONE;
 
-		if(frame->linesize[i] == width)
-			memcpy(buf, frame->data[i], size);
-		else
-		{
-			for(int l=0; l<height; l++)
-				memcpy(buf + width * l * conversion_config->plane_configs[i].data_per_pixel, frame->data[i] + frame->linesize[i] * l, width * conversion_config->plane_configs[i].data_per_pixel);
-		}
+	EGLDisplay egl_display = eglGetCurrentDisplay();
 
-		f->glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-
-		f->glBindTexture(GL_TEXTURE_2D, tex[i]);
-		f->glTexImage2D(GL_TEXTURE_2D, 0, conversion_config->plane_configs[i].internal_format, width, height, 0, conversion_config->plane_configs[i].format, GL_UNSIGNED_BYTE, nullptr);
+	const EGLImage image = eglCreateImageKHR( egl_display,
+                                              EGL_NO_CONTEXT,
+                                              EGL_LINUX_DMA_BUF_EXT,
+                                              NULL, attribs);
+	if (!image) {
+		printf("Failed to create EGLImage\n");
+		return -1;
 	}
 
-	f->glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+	/// his
+	glGenTextures(1, &texture);
+	glEnable(GL_TEXTURE_EXTERNAL_OES);
+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
 
-	f->glFinish();
+	new_texture = texture;
 
+	eglDestroyImageKHR(&egl_display, image);
+	
+	//printf("END AVOpenGLFrame::Update\n\n");
 	return true;
 }
 
 void AVOpenGLWidget::initializeGL()
-{
+{	
+	printf("\nAVOpenGLWidget::initializeGL\n");
+	
 	auto f = QOpenGLContext::currentContext()->extraFunctions();
 
 	const char *gl_version = (const char *)f->glGetString(GL_VERSION);
-	CHIAKI_LOGI(session->GetChiakiLog(), "OpenGL initialized with version \"%s\"", gl_version ? gl_version : "(null)");
+	CHIAKI_LOGI(session->GetChiakiLog(), "\n\n\nOpenGL initialized with version \"%s\"", gl_version ? gl_version : "(null)");
 
 #ifdef DEBUG_OPENGL
 	auto logger = new QOpenGLDebugLogger(this);
@@ -298,20 +437,31 @@ void AVOpenGLWidget::initializeGL()
 		return;
 	}
 
-	for(int i=0; i<2; i++)
+	//for(int i=0; i<2; i++) // two swap frames. Don't want.
+	for(int i=0; i<1; i++)
 	{
 		frames[i].conversion_config = conversion_config;
 		f->glGenTextures(conversion_config->planes, frames[i].tex);
 		f->glGenBuffers(conversion_config->planes, frames[i].pbo);
 		uint8_t uv_default[] = {0x7f, 0x7f};
 		for(int j=0; j<conversion_config->planes; j++)
-		{
-			f->glBindTexture(GL_TEXTURE_2D, frames[i].tex[j]);
-			f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			f->glTexImage2D(GL_TEXTURE_2D, 0, conversion_config->plane_configs[j].internal_format, 1, 1, 0, conversion_config->plane_configs[j].format, GL_UNSIGNED_BYTE, j > 0 ? uv_default : nullptr);
+		{	
+			f->glEnable(GL_TEXTURE_EXTERNAL_OES);
+			//f->glBindTexture(GL_TEXTURE_EXTERNAL_OES, frames[i].tex[j]);
+			f->glBindTexture(GL_TEXTURE_EXTERNAL_OES, frames[i].new_texture);
+			//f->glTexParameterf(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			//f->glTexParameterf(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			//f->glTexParameterf(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			//f->glTexParameterf(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			f->glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, conversion_config->plane_configs[j].internal_format, 1, 1, 0, conversion_config->plane_configs[j].format, GL_UNSIGNED_BYTE, j > 0 ? uv_default : nullptr);
+
+            // ORIG
+			//~ f->glBindTexture(GL_TEXTURE_2D, frames[i].tex[j]);
+			//~ f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			//~ f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			//~ f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			//~ f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			//~ f->glTexImage2D(GL_TEXTURE_2D, 0, conversion_config->plane_configs[j].internal_format, 1, 1, 0, conversion_config->plane_configs[j].format, GL_UNSIGNED_BYTE, j > 0 ? uv_default : nullptr);
 		}
 		frames[i].width = 0;
 		frames[i].height = 0;
@@ -361,10 +511,13 @@ void AVOpenGLWidget::initializeGL()
 	frame_uploader_context->moveToThread(frame_uploader_thread);
 	frame_uploader->moveToThread(frame_uploader_thread);
 	frame_uploader_thread->start();
+	
+	printf("END AVOpenGLWidget::initializeGL\n");
 }
 
 void AVOpenGLWidget::paintGL()
-{
+{	
+	//printf("\nPaint GL\n");
 	auto f = QOpenGLContext::currentContext()->extraFunctions();
 
 	f->glClear(GL_COLOR_BUFFER_BIT);
@@ -398,13 +551,20 @@ void AVOpenGLWidget::paintGL()
 
 	f->glViewport((widget_width - vp_width) / 2, (widget_height - vp_height) / 2, vp_width, vp_height);
 
-	for(int i=0; i<3; i++)
-	{
-		f->glActiveTexture(GL_TEXTURE0 + i);
-		f->glBindTexture(GL_TEXTURE_2D, frame->tex[i]);
-	}
+	f->glBindTexture(GL_TEXTURE_EXTERNAL_OES, frame->new_texture);
+
+	//for(int i=0; i<3; i++)
+	//~ for(int i=0; i<3; i++)
+	//~ {
+		//~ f->glActiveTexture(GL_TEXTURE0 + i);
+		//~ //f->glBindTexture(GL_TEXTURE_EXTERNAL_OES, frame->tex[i]);
+		//~ f->glBindTexture(GL_TEXTURE_EXTERNAL_OES, frame->new_texture);
+	//~ }
 
 	f->glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	
+	glDeleteTextures(1, &frame->new_texture);
 
-	f->glFinish();
+	//f->glFinish();
+	//printf("END GlPaint\n\n");
 }

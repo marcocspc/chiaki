@@ -26,14 +26,19 @@ void AVOpenGLFrameUploader::UpdateFrameFromDecoder()
 		return;
 	}
 
-	if(QOpenGLContext::currentContext() != context)
+	if(QOpenGLContext::currentContext() != context){
 		context->makeCurrent(surface);
+		printf("AVOpenGLFrameUploader Context Error of some kind\n");
+	}
 
 	AVFrame *next_frame = chiaki_ffmpeg_decoder_pull_frame(decoder);
-	if(!next_frame)
+	if(!next_frame){
+		printf("No next frame in Uploader\n");
 		return;
+	}
 
 	bool success = widget->GetBackgroundFrame()->Update(next_frame, decoder->log);
+	
 	av_frame_free(&next_frame);
 
 	if(success)

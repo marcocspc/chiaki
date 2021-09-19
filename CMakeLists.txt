@@ -22,7 +22,9 @@ else()
 	set(CHIAKI_FFMPEG_DEFAULT AUTO)
 endif()
 tri_option(CHIAKI_ENABLE_FFMPEG_DECODER "Enable FFMPEG video decoder" ${CHIAKI_FFMPEG_DEFAULT})
+#option(CHIAKI_ENABLE_FFMPEG_DECODER ON)
 tri_option(CHIAKI_ENABLE_PI_DECODER "Enable Raspberry Pi-specific video decoder (requires libraspberrypi0 and libraspberrypi-doc)" AUTO)
+option(CHIAKI_ENABLE_PI_DECODER OFF)
 option(CHIAKI_LIB_ENABLE_MBEDTLS "Use mbedtls instead of OpenSSL as part of Chiaki Lib" OFF)
 option(CHIAKI_LIB_OPENSSL_EXTERNAL_PROJECT "Use OpenSSL as CMake external project" OFF)
 option(CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER "Use SDL Gamecontroller for Input" ON)
@@ -92,15 +94,52 @@ if(CHIAKI_LIB_ENABLE_MBEDTLS)
 endif()
 
 if(CHIAKI_ENABLE_FFMPEG_DECODER)
-	find_package(FFMPEG COMPONENTS avcodec avutil)
-	if(FFMPEG_FOUND)
+	
+	set(CMAKE_PREFIX_PATH "/home/pi/dev/rpi-ffmpeg/out/armv7-buster-shared-rel/install")
+	find_package(PkgConfig REQUIRED)	
+	pkg_check_modules(PC_FFMPEG avcodec avutil avformat)
+
+	find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h HINTS ${PC_FFMPEG_LIBAVFORMAT_INCLUDEDIR} ${PC_FFMPEG_INCLUDE_DIRS})
+	find_library(AVFORMAT_LIBRARY NAMES avformat HINTS ${PC_FFMPEG_LIBAVFORMAT_LIBDIR} ${PC_FFMPEG_LIBRARY_DIRS})
+
+	find_path(AVCODEC_INCLUDE_DIR libavcodec/avcodec.h HINTS ${PC_FFMPEG_LIBAVCODEC_INCLUDEDIR} ${PC_FFMPEG_INCLUDE_DIRS})
+	find_library(AVCODEC_LIBRARY NAMES avcodec HINTS ${PC_FFMPEG_LIBAVCODEC_LIBDIR} ${PC_FFMPEG_LIBRARY_DIRS})
+
+	find_path(AVUTIL_INCLUDE_DIR libavutil/avutil.h HINTS ${PC_FFMPEG_LIBAVUTIL_INCLUDEDIR} ${PC_FFMPEG_INCLUDE_DIRS})
+	find_library(AVUTIL_LIBRARY NAMES avutil HINTS ${PC_FFMPEG_LIBAVUTIL_LIBDIR} ${PC_FFMPEG_LIBRARY_DIRS})
+
+	include(FindPackageHandleStandardArgs)
+	find_package_handle_standard_args(AVFormat DEFAULT_MSG AVFORMAT_LIBRARY AVFORMAT_INCLUDE_DIR)
+	find_package_handle_standard_args(AVCodec DEFAULT_MSG AVCODEC_LIBRARY AVCODEC_INCLUDE_DIR)
+	find_package_handle_standard_args(AVUtil DEFAULT_MSG AVUTIL_LIBRARY AVUTIL_INCLUDE_DIR)
+
+	mark_as_advanced(AVFORMAT_INCLUDE_DIR AVFORMAT_LIBRARY)
+	mark_as_advanced(AVCODEC_INCLUDE_DIR AVCODEC_LIBRARY)
+	mark_as_advanced(AVUTIL_INCLUDE_DIR AVUTIL_LIBRARY)
+
+	set(FFMPEG_INCLUDE_DIRS ${AVFORMAT_INCLUDE_DIR} ${AVCODEC_INCLUDE_DIR} ${AVUTIL_INCLUDE_DIR})
+	set(FFMPEG_LIBRARIES ${AVUTIL_LIBRARY} ${AVCODEC_LIBRARY} ${AVFORMAT_LIBRARY})
+
+	if(${AVFORMAT_FOUND} AND ${AVCODEC_FOUND} AND ${AVUTIL_FOUND})
 		set(CHIAKI_ENABLE_FFMPEG_DECODER ON)
+		message("--- FFMPEG FOUND ---")
+		#message("${FFMPEG_INCLUDE_DIRS}")
+		message("${FFMPEG_LIBRARIES}")
 	else()
-		if(NOT CHIAKI_ENABLE_FFMPEG_DECODER STREQUAL AUTO)
-			message(FATAL_ERROR "CHIAKI_ENABLE_FFMPEG_DECODER is set to ON, but ffmpeg could not be found.")
-		endif()
 		set(CHIAKI_ENABLE_FFMPEG_DECODER OFF)
+		message("--- FFMPEG NOT FOUND ---")
 	endif()
+
+
+	#~ find_package(FFMPEG COMPONENTS avcodec avutil)
+	#~ if(FFMPEG_FOUND)
+		#~ set(CHIAKI_ENABLE_FFMPEG_DECODER ON)
+	#~ else()
+		#~ if(NOT CHIAKI_ENABLE_FFMPEG_DECODER STREQUAL AUTO)
+			#~ message(FATAL_ERROR "CHIAKI_ENABLE_FFMPEG_DECODER is set to ON, but ffmpeg could not be found.")
+		#~ endif()
+		#~ set(CHIAKI_ENABLE_FFMPEG_DECODER OFF)
+	#~ endif()
 endif()
 
 if(CHIAKI_ENABLE_FFMPEG_DECODER)
@@ -122,6 +161,9 @@ The Raspberry Pi Decoder is only supported on Raspberry Pi OS and requires libra
 		set(CHIAKI_ENABLE_PI_DECODER OFF)
 	endif()
 endif()
+# FRED
+set(CHIAKI_ENABLE_PI_DECODER OFF)
+
 
 if(CHIAKI_ENABLE_PI_DECODER)
 	message(STATUS "Pi Decoder enabled")

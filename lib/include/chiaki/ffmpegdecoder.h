@@ -10,10 +10,19 @@ extern "C" {
 #endif
 
 #include <libavcodec/avcodec.h>
+//fred
+//#include "/home/pi/dev/rpi-ffmpeg/out/armv7-buster-static-rel/install/include/arm-linux-gnueabihf/libavutil/pixfmt.h"
+#include <libavformat/avformat.h>
+#include <libavutil/pixdesc.h>
+#include <libavutil/hwcontext.h>
+#include <libavutil/opt.h>
+#include <libavutil/avassert.h>
+#include <libavutil/imgutils.h>
+#include "libavutil/hwcontext_drm.h"
 
 typedef struct chiaki_ffmpeg_decoder_t ChiakiFfmpegDecoder;
 
-typedef void (*ChiakiFfmpegFrameAvailable)(ChiakiFfmpegDecoder *decover, void *user);
+typedef void (*ChiakiFfmpegFrameAvailable)(ChiakiFfmpegDecoder *decoder, void *user);
 
 struct chiaki_ffmpeg_decoder_t
 {
