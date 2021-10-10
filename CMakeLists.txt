@@ -9,9 +9,9 @@ macro(tri_option name desc default)
     set_property(CACHE "${name}" PROPERTY STRINGS AUTO ON OFF)
 endmacro()
 
-option(CHIAKI_ENABLE_TESTS "Enable tests for Chiaki" ON)
+option(CHIAKI_ENABLE_TESTS "Enable tests for Chiaki" OFF)
 option(CHIAKI_ENABLE_CLI "Enable CLI for Chiaki" OFF)
-option(CHIAKI_ENABLE_GUI "Enable Qt GUI" ON)
+option(CHIAKI_ENABLE_GUI "Enable Qt GUI" OFF)
 option(CHIAKI_ENABLE_ANDROID "Enable Android (Use only as part of the Gradle Project)" OFF)
 option(CHIAKI_ENABLE_BOREALIS "Enable Borealis GUI (For Nintendo Switch or PC)" OFF)
 tri_option(CHIAKI_ENABLE_SETSU "Enable libsetsu for touchpad input from controller" AUTO)
@@ -48,6 +48,7 @@ set(CPACK_DEBIAN_PACKAGE_SECTION "games")
 include(CPack)
 
 set(CHIAKI_IS_SWITCH ${NSWITCH})
+#set(CHIAKI_IS_SWITCH ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_CURRENT_SOURCE_DIR}/setsu/cmake")
 
@@ -55,7 +56,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 if(CHIAKI_IS_SWITCH)
 	# force mbedtls as crypto lib
-	set(CHIAKI_LIB_ENABLE_MBEDTLS ON)
+	#set(CHIAKI_LIB_ENABLE_MBEDTLS ON)
 	add_definitions(-D__SWITCH__)
 endif()
 
@@ -218,3 +219,8 @@ endif()
 if(CHIAKI_ENABLE_BOREALIS)
 	add_subdirectory(switch)
 endif()
+
+#fred rpi
+add_subdirectory(rpi)
+
+
