@@ -11,16 +11,146 @@
 /// Try:  gpu=96(config.txt), cma=64M(cmdline.txt)
 
 #define PING_MS		500
-#define HOSTS_MAX	3		// was 16
 #define DROP_PINGS	3
 #define CHIAKI_SESSION_AUTH_SIZE 0x10
+
+static void RegistEventCB(ChiakiRegistEvent *event, void *user)
+{
+	printf("In  host RegistEventCB\n");
+	// not sure if the Gui should be doing this
+	Host *host = (Host *)user;
+	//host->RegistCB(event);
+	
+	switch(event->type)
+	{
+		case CHIAKI_REGIST_EVENT_TYPE_FINISHED_CANCELED:
+			printf("Registration Cancelled\n");
+			break;
+		case CHIAKI_REGIST_EVENT_TYPE_FINISHED_FAILED:
+			printf("Registration fail\n");
+			break;
+		case CHIAKI_REGIST_EVENT_TYPE_FINISHED_SUCCESS:
+
+			ChiakiRegisteredHost *r_host = event->registered_host;
+			
+			char regist_key[128];
+			memcpy(regist_key, r_host->rp_regist_key, sizeof(regist_key));
+			std::string regist_key_str(regist_key);
+			printf("Regist Key:  %s\n", regist_key);
+			
+			
+			/// uint8_t rp_key[0x10] = {0};
+			/// std::string Host::GetHostRPKey(Host *host)
+			/// memcpy(rp_key, r_host->rp_key, sizeof(rp_key));
+			
+			/// 8WD4B1ycVIJ6GAW5vIDKFQ==  
+			std::string rp_key_str = host->GetHostRPKey(r_host->rp_key);
+			printf("GetHostRPKey: %s\n", rp_key_str.c_str());
+			
+			/// Save to settings file 
+			// Only host[0] for now
+			host->gui->settings->all_host_settings.at(0).regist = regist_key_str;
+			host->gui->settings->all_host_settings.at(0).rp_key = rp_key_str;
+			host->gui->settings->WriteYaml(host->gui->settings->all_host_settings);
+			
+			// Not correct! Needs to be Discovered's state
+			host->gui->setClientState(std::string("ready"));
+			printf("Registration Success!!\n");
+			break;
+	}
+	
+	//chiaki_regist_stop(&gui->regist);
+	//chiaki_regist_fini(&gui->regist);
+}
 
 // Can I make the ConnectionEventCB into this instead to save recursion?
 static void EventCB(ChiakiEvent *event, void *user)
 {	
-	//printf("In EventCB\n");
+	///printf("In EventCB\n");
 	Host *host = (Host *)user;
 	host->ConnectionEventCB(event);
+}
+
+static void DiscoveryServiceHostsCallback(ChiakiDiscoveryHost *hosts, size_t hosts_count, void *user);
+
+
+// NEEDS FIXING UP FOR MULTIPLE HOSTS, PS5's
+//
+/// triggers both on initial discovery and comeback after wakeup signal.
+static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count, void *user)
+{
+	printf("In Discovery()\n");
+	Host *host = (Host *)user;
+
+	/// This triggers again after first time need to filter
+	host->discoveredHosts = discovered_hosts;
+
+	// Needs to be expanded to multi host
+	host->state = chiaki_discovery_host_state_string(discovered_hosts->state);
+	printf("State:  %s\n", host->state.c_str());
+	
+	
+	//~ A(host_addr); \
+	//~ A(system_version); \
+	//~ A(device_discovery_protocol_version); \
+	//~ A(host_name); \
+	//~ A(host_type); \
+	//~ A(host_id); \
+	//~ A(running_app_titleid); \
+	//~ A(running_app_name);
+	/// to
+	//~ std::string nick_name;
+	//~ std::string id; //mac or id?
+	//~ std::string rp_key;
+	//~ std::string regist;
+
+	/// IF hosts settings are empty (so nothing was read from file earlier)
+	/// We just add this found one straight away.
+	if(host->gui->settings->all_host_settings.size() == 0)
+	{	
+		printf("No Hosts found in file\n");
+		rpi_settings_host new_host;
+		new_host.nick_name = discovered_hosts->host_name;
+		new_host.id = discovered_hosts->host_id;
+		/// The others added at Regist time
+		
+		/// Also add default Session settings
+		new_host.sess.decoder = "v4l2-drm";
+		new_host.sess.codec   = "h264";
+		new_host.sess.resolution = "1080";
+		new_host.sess.fps = "60";
+		new_host.sess.audio_device = "hdmi"; 
+		
+		std::vector<rpi_settings_host> all_host_settings;
+		all_host_settings.push_back(new_host);
+		host->gui->settings->WriteYaml(all_host_settings);
+		
+		host->gui->setClientState(std::string("notreg"));
+		printf("Wrote initial host settings to file\n");
+	}
+	else /// hosts were found in settings
+	{
+		for(int i=0; i<hosts_count; i++) /// each discovered host
+		{
+			ChiakiDiscoveryHost *dh = host->discoveredHosts+i;
+			for(rpi_settings_host sh : host->gui->settings->all_host_settings) /// each host in settings file
+			{
+				if(sh.regist == "") { /// means discovered is not registered
+					printf("Host needs to be registered!\n");
+					host->gui->setClientState(std::string("notreg"));
+					return;
+				} else {/// it is registered already
+					// Needs to get actual discovered's State 
+					std::string state = chiaki_discovery_host_state_string(dh->state);
+					host->gui->setClientState(state);
+				}
+			}
+		}
+
+	}
+
+	/// gui pointer should be filled now so we can update the gui.
+	/// host->gui->setClientState(host->state);
 }
 
 static bool VideoCB(uint8_t *buf, size_t buf_size, void *user)
@@ -42,22 +172,26 @@ static void AudioCB(int16_t *buf, size_t samples_count, void *user)
 	io->AudioCB(buf, samples_count);
 }
 
+/// Session Main loop
 void *play(void *user)
-{
+{	
+	printf("Thread starting, play()\n");
 	//ORIGorig(void)user;
 	Host *host = (Host *)user;
 
 	while(1)
-	{
+	{	
 		host->io->HandleJoyEvent();
 		chiaki_session_set_controller_state(&host->session, &host->io->controller_state);
+
 		SDL_Delay(4); ///ms
 	}
 }
 
+
 Host::Host()
 {
-	chiaki_log_init(&log, 1, NULL, NULL);  // 1, 4, 14
+	chiaki_log_init(&log, 4, NULL, NULL);  // 1, 4, 14
 	///chiaki_log_init(&log, CHIAKI_LOG_ALL & ~CHIAKI_LOG_VERBOSE, NULL, NULL);
 	
 	printf("Rpi Host created\n");
@@ -76,16 +210,27 @@ int Host::Init(IO *io)
 	ChiakiErrorCode err;
 
 	this->io = io;
+			
+	chiaki_opus_decoder_init(&opus_decoder, &log);
 	
+	printf("END HostInit\n");
+	return 0;
+}
+
+
+int Host::StartDiscoveryService()
+{
+	//typedef void (*ChiakiDiscoveryServiceCb)(ChiakiDiscoveryHost *hosts, size_t hosts_count, void *user);
+	//discovery_cb = DiscoveryCB(void*);
 	
-	/// Starting a Discovery Service - helps with IP
-	/// Temp to get PS type version
 	ChiakiDiscoveryServiceOptions *options = new ChiakiDiscoveryServiceOptions;
 	options->ping_ms = PING_MS;
 	options->hosts_max = HOSTS_MAX;
 	options->host_drop_pings = DROP_PINGS;
-	//options.cb = Discovery;   // type  ChiakiDiscoveryServiceCb
-	//options.cb_user = this;
+	options->cb = Discovery;		// type  ChiakiDiscoveryServiceCb
+	options->cb_user = this;		/// the Host
+	
+	
 	
 	ChiakiDiscoveryService *service = new ChiakiDiscoveryService;
 	///from discoverymanager
@@ -95,118 +240,107 @@ int Host::Init(IO *io)
 	options->send_addr = reinterpret_cast<sockaddr *>(&addr);
 	options->send_addr_size = sizeof(addr);
 	
-	ChiakiConnectInfo connect_info;
-	int foundHost=0;
-	std::string state;  /// standby, etc
+	///ChiakiConnectInfo connect_info;
+	///int foundHost=0;
+	///std::string state;  /// standby, etc
 	
-	err = chiaki_discovery_service_init(service, options, &log);
+	int err = chiaki_discovery_service_init(service, options, &log);
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
 		CHIAKI_LOGE(&log, "DiscoveryManager failed to init Discovery Service");
 		return -1;
 	}
 	
-	ChiakiTarget target = CHIAKI_TARGET_PS4_UNKNOWN;  ///will be filled in. console+firmware, I think. An Enum
+	printf("Discovery Service started\n");
+	return 0;
+}
 
-	/// check for discoveries
-	for(int i=0; i<10; i++)
-	{
-		printf("Searching for Playstation Host [%d/10]\n", i+1);
-		
-		foundHost = service->hosts_count;
-		state = chiaki_discovery_host_state_string(service->hosts->state);
-		printf("State:  %s\n", state.c_str());
+// will need number for which discoveredHost
+void Host::RegistStart(std::string accountID, std::string pin)
+{	
 
-		if(foundHost==1)
-		{	
-			target = chiaki_discovery_host_system_version_target(service->hosts);
-			printf("Target:  %d\n", target);  //  Target:  1000, CHIAKI_TARGET_PS4_10
-			if(target == CHIAKI_TARGET_PS4_UNKNOWN)
-				printf("Oh No target still Unknown!\n");\
-				
-			/// HOST IP
-			connect_info.host = service->hosts->host_addr;
-			printf("Host Addr:  %s\n", connect_info.host);
-			i=10;
-		}
-		sleep(1);
-	}
-	////////////   END Discovery Service
-		
-	chiaki_opus_decoder_init(&opus_decoder, &log);
-	ChiakiAudioSink audio_sink;
+	RpiSettings settings;
+	accId_len =  settings.GetB64encodeSize(accountID.length());
 
-	///	676f894f
-	///	\xf1`\xf8\a\\\x9cT\x52z\x18\x5\x59\xbc\x20\xca\x15
-	std::vector<std::string> settings_in = ReadRpiSettings();
-	
-	ChiakiVideoResolutionPreset resolution_preset = CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
-	ChiakiVideoFPSPreset fps_preset = CHIAKI_VIDEO_FPS_PRESET_60;
-		
-	strcpy(connect_info.regist_key, settings_in.at(0).c_str());  //from settings file
-	printf("Regist Key:  %s\n", connect_info.regist_key);
+	ChiakiErrorCode err = chiaki_base64_decode(
+			accountID.c_str(), accountID.length(),
+			regist_info.psn_account_id, &accId_len);
+	if(err != CHIAKI_ERR_SUCCESS)
+		printf("Base64 decode of AccountID failed\n");
 
-	/// https://en.cppreference.com/w/cpp/language/ascii
-	/// char byte_aray2[16] = {241, 96, 248, 7, 92, 156, 84, 130, 122, 24, 5, 185, 188, 128, 202, 21};
-	std::vector<char> key_bytes = KeyStr2ByteArray(settings_in[1].c_str());
-	memcpy(&connect_info.morning, key_bytes.data(), sizeof(connect_info.morning)); //from settings file
-	printf("RPKey_morning:  %s\n", connect_info.morning);
+	regist_info.target = chiaki_discovery_host_system_version_target(discoveredHosts);
+	printf("Regist Target:  %d\n", regist_info.target);
 	
-	/// If Sleeping (orange light)
-	if(foundHost==1 && (state == "standby" || state == "unknown"))
-	{
-		printf("Sending Wakeup!\n");
+	regist_info.psn_online_id = nullptr; /// using regist_info.psn_account_id for higher targets
+	
+	sscanf(pin.c_str(), "%"SCNu32, &regist_info.pin);
+		printf("PIN int:  %d\n", regist_info.pin);
 		
-		uint64_t credential = (uint64_t)strtoull(connect_info.regist_key, NULL, 16);
-		chiaki_discovery_wakeup(&log, NULL,	connect_info.host, credential, 0);// Last is this->IsPS5()
+	regist_info.host = discoveredHosts->host_addr; /// ip
+		printf("Host Addr:  %s\n", regist_info.host);
 		
-		sleep(1);
-	}
-	while(state == "standby" || state == "unknown")
-	{
-		state = chiaki_discovery_host_state_string(service->hosts->state);
-		printf("Waiting for \"ready\", now:  \"%s\"\n", state.c_str());
-		sleep(2);
-		if(state == "ready") {
-			printf("\nPlaystation now Awake! Please re-run chiaki-rpi!\n\n");
-			exit(1);
-		}
-	}
+	regist_info.broadcast = false;
+	
+	chiaki_regist_start(&regist, &log, &regist_info, RegistEventCB, this);
 
+	sleep(3); // Need 3 here. But shouldn't it have it's own thread??
+	
+	printf("END RegistClick\n");
+}
+
+
+int Host::StartSession()
+{	
+	ChiakiErrorCode err;
+	
+	//~ {
+	//~ bool ps5;
+	//~ const char *host; // null terminated
+	//~ char regist_key[CHIAKI_SESSION_AUTH_SIZE]; // must be completely filled (pad with \0)
+	//~ uint8_t morning[0x10];
+	//~ ChiakiConnectVideoProfile video_profile;
+	//~ bool video_profile_auto_downgrade; // Downgrade video_profile if server does not seem to support it.
+	//~ bool enable_keyboard;
+	//~ } ChiakiConnectInfo;
 	
 	
+	/// Take Host[0] data from settings
+	///
+	const char* regist = gui->settings->all_host_settings.at(0).regist.c_str();
+	memcpy(&connect_info.regist_key, regist, sizeof(connect_info.regist_key));
+	///printf("\nRegist:%sEND\n", connect_info.regist_key);
 	
 	
+	/// 8WD4B3ycVIJ5GAW5vIDLFQ==
+	uint8_t rp_key[0x10] = {0};
+	size_t rp_key_sz = sizeof(rp_key);
+	
+	chiaki_base64_decode(
+		gui->settings->all_host_settings.at(0).rp_key.c_str(), gui->settings->all_host_settings.at(0).rp_key.length(),
+		rp_key, &rp_key_sz);
+	memcpy(&connect_info.morning, rp_key, sizeof(connect_info.morning));
+	/// OLD method
+	///std::vector<char> rp_key = KeyStr2ByteArray(gui->settings->all_host_settings.at(0).rp_key);
+	///memcpy(&connect_info.morning, rp_key.data(), sizeof(connect_info.morning));
+	printf("Rp Key:%sEND\n", connect_info.morning);
+	
+	connect_info.host = discoveredHosts->host_addr;
+	///printf("PS4 IP addr:  %s\n", connect_info.host);
+	
+	/// Init Session
 	connect_info.ps5 = false;
 	connect_info.video_profile_auto_downgrade = false;
 	connect_info.enable_keyboard = false;
-	//connect_info.video_profile.bitrate = 15000;
-	session.connect_info.video_profile.max_fps = fps_preset;
-	//session.connect_info.video_profile.width = 1280;
-	//session.connect_info.video_profile.height = 720;
-	//session.connect_info.video_profile.bitrate = 15000;
-	session.connect_info.video_profile_auto_downgrade = false;
-	
-	//connect_info.video_profile.codec = CHIAKI_CODEC_H264;
-	//session.connect_info.video_profile.codec = CHIAKI_CODEC_H264;
-	
-	//connect_info.video_profile.bitrate = 15000;
-	
-//~ unsigned int width;
-//~ unsigned int height;
-//~ unsigned int max_fps;
-//~ unsigned int bitrate;
-//~ ChiakiCodec codec;
-//~ } ChiakiConnectVideoProfile;
-
+	connect_info.video_profile.codec = CHIAKI_CODEC_H264;
+	ChiakiVideoResolutionPreset resolution_preset = CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
+	ChiakiVideoFPSPreset fps_preset = CHIAKI_VIDEO_FPS_PRESET_60;
 	chiaki_connect_video_profile_preset(&connect_info.video_profile, resolution_preset, fps_preset);
-	//printf("E\n");
-	
+
 	err = chiaki_session_init(&session, &connect_info, &log);
 	//free((void *)connect_info.host);
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
-		printf("ailed to init session\n");
+		printf("Failed to init session\n");
 		return 1;
 	}
 	
@@ -216,17 +350,8 @@ int Host::Init(IO *io)
 	chiaki_opus_decoder_get_sink(&opus_decoder, &audio_sink);
 	chiaki_session_set_audio_sink(&session, &audio_sink);
 	chiaki_session_set_video_sample_cb(&session, VideoCB, io); /// send to IO to execute
-	//chiaki_session_set_event_cb(&this->session, EventCB, this);
 	
-
-	return 0;
-}
-
-
-int Host::StartSession()
-{	
-	ChiakiErrorCode err;
-			
+	/// Actually start		
 	err = chiaki_session_start(&session);
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
@@ -234,12 +359,12 @@ int Host::StartSession()
 		CHIAKI_LOGE(&log, "Session start failed: %s\n", chiaki_error_string(err));
 		return 1;
 	}
-	printf("After chiaki session start\n");
 	printf("Session Bitrate:  %d\n", session.connect_info.video_profile.bitrate);
 	printf("Session target:  %d\n", session.target);
 
 	chiaki_session_set_event_cb(&session, EventCB, this);
-
+	printf("END chiaki session start\n");
+	
 	return 0;
 }
 
@@ -250,7 +375,7 @@ void Host::ConnectionEventCB(ChiakiEvent *event)
 	switch(event->type)
 	{
 		case CHIAKI_EVENT_CONNECTED:
-			printf("EventCB CHIAKI_EVENT_CONNECTED\n");
+			printf("ConnectionEventCB() CHIAKI_EVENT_CONNECTED\n");
 			chiaki_thread_create(&play_th, play, this);
 			//session, chiaki_thread_create(&session->session_thread, session_thread_func, session);
 			//if(this->chiaki_event_connected_cb != nullptr)
@@ -266,57 +391,40 @@ void Host::ConnectionEventCB(ChiakiEvent *event)
 			//~ if(this->chiaki_event_rumble_cb != nullptr)
 				//~ this->chiaki_event_rumble_cb(event->rumble.left, event->rumble.right);
 			//~ break;
-		//~ case CHIAKI_EVENT_QUIT:
-			//~ CHIAKI_LOGI(this->log, "EventCB CHIAKI_EVENT_QUIT");
-			//~ if(this->chiaki_event_quit_cb != nullptr)
-				//~ this->chiaki_event_quit_cb(&event->quit);
-			//~ break;
+		case CHIAKI_EVENT_QUIT:
+			CHIAKI_LOGI(&log, "EventCB CHIAKI_EVENT_QUIT");
+			//if(this->chiaki_event_quit_cb != nullptr)
+			//	this->chiaki_event_quit_cb(&event->quit);
+			break;
 	}
 }
 
-bool Host::SetHostRPKey(Host *host, std::string rp_key_b64)
+void Host::DiscoveryCB(ChiakiDiscoveryHost *discovered_host)
 {
-	if(host != nullptr)
+	printf("In DiscoveryCB()\n");
+}
+
+std::string Host::GetHostRPKey(uint8_t rp_key[])
+{
+	//if(rp_key != nullptr)
 	{
-		size_t rp_key_sz = sizeof(host->rp_key);
-		ChiakiErrorCode err = chiaki_base64_decode(
-			rp_key_b64.c_str(), rp_key_b64.length(),
-			host->rp_key, &rp_key_sz);
-		if(CHIAKI_ERR_SUCCESS != err)
-			CHIAKI_LOGE(&this->log, "Failed to parse RP_KEY %s (it must be a base64 encoded)", rp_key_b64.c_str());
+		size_t B64EncSize = ((4 * 0x10 / 3) + 3) & ~3;
+		size_t rp_key_b64_sz = B64EncSize;
+		//size_t rp_key_b64_sz = this->GetB64encodeSize(0x10);
+		char rp_key_b64[rp_key_b64_sz + 1] = { 0 };
+		ChiakiErrorCode err;
+		err = chiaki_base64_encode(
+			rp_key, 0x10,
+			rp_key_b64, sizeof(rp_key_b64));
+
+		if(CHIAKI_ERR_SUCCESS == err)
+			return rp_key_b64;
 		else
-			return true;
+			CHIAKI_LOGE(&this->log, "Failed to encode rp_key to base64");
+
 	}
-	else
-		CHIAKI_LOGE(&this->log, "Cannot SetHostRPKey from nullptr host");
-
-	return false;
-}
-
-std::string Host::GetHostRPKey(Host *host)
-{
-	if(host != nullptr)
-	{
-		if(host->rp_key_data || host->registered)
-		{
-
-			size_t B64EncSize = ((4 * 0x10 / 3) + 3) & ~3;
-			size_t rp_key_b64_sz = B64EncSize;
-			//size_t rp_key_b64_sz = this->GetB64encodeSize(0x10);
-			char rp_key_b64[rp_key_b64_sz + 1] = { 0 };
-			ChiakiErrorCode err;
-			err = chiaki_base64_encode(
-				host->rp_key, 0x10,
-				rp_key_b64, sizeof(rp_key_b64));
-
-			if(CHIAKI_ERR_SUCCESS == err)
-				return rp_key_b64;
-			else
-				CHIAKI_LOGE(&this->log, "Failed to encode rp_key to base64");
-		}
-	}
-	else
-		CHIAKI_LOGE(&this->log, "Cannot GetHostRPKey from nullptr host");
+	//else
+	//	CHIAKI_LOGE(&this->log, "Cannot GetHostRPKey from nullptr host");
 
 	return "";
 }

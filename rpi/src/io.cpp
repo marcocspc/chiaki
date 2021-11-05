@@ -1,7 +1,11 @@
 #include <rpi/io.h>
 
 
-//static FILE *output_file = NULL;
+/// Gamepad special input actions:
+///
+/// R3+Circle to quit
+///
+///
 
 
 static enum AVPixelFormat get_hw_format(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts)
@@ -28,9 +32,6 @@ int IO::Init(Host *host)
 {	
 	ChiakiErrorCode err;
 	this->host = host;
-	
-	/// did I not do this elsewhere?
-	//chiaki_session_set_video_sample_cb(&session, chiaki_ffmpeg_decoder_video_sample_cb, ffmpeg_decoder);
 	
 	return 0;
 }
@@ -67,20 +68,19 @@ int IO::InitGamepads()
 		return 1;
 	}
 	
-	fprintf(stdout, "Joysticks currently attached: %i\n", SDL_NumJoysticks());
+	fprintf(stdout, "Gamepads currently attached: %i\n", SDL_NumJoysticks());
 	if(SDL_NumJoysticks() == 0)
-		fprintf(stdout, "Check the joystick is properly connected.\nIf the problem persist, you can check the connected USB device with 'lsusb' and the logs in /var/logs/syslog\n"); 
+		fprintf(stdout, "Check the gamepad is properly connected\n"); 
 	
 	/// Also actually open - add more checks later
 	for(int i=0; i<SDL_NumJoysticks(); i++)
 	{
-		//joysticks[i] = SDL_JoystickOpen(i); // probably don't need the joysticks?
 		gamecontrollers[i] = SDL_GameControllerOpen(i);
 		printf("Controller is:  %s\n", SDL_GameControllerName(gamecontrollers[i]));
 	}
 	
 	SDL_JoystickEventState(SDL_ENABLE);
-	
+
 	return 0;
 }
 
@@ -95,45 +95,55 @@ int IO::RefreshGamepads()
 	
 	return 0;
 }
-	
 
+void IO::SwitchInputReceiver(std::string target)	/// gui/session
+{
+	if(target == std::string("gui")){
+		host->gui->takeInput=1;
+		takeInput=0;
+	} else {
+		host->gui->takeInput=0;
+		takeInput=1;
+	}
+}
+
+/// The input for the session
 void IO::HandleJoyEvent(void)
 {	
 	SDL_Event event;
 	
-	/// reading events from the event queue
-	while (SDL_PollEvent(&event))
+	if(takeInput)
 	{
-		switch (event.type)
+	/// reading events from the event queue
+		while (SDL_PollEvent(&event))
 		{
-			case SDL_QUIT:
-				exit(0);
-				break;
-			case SDL_CONTROLLERBUTTONUP:
-			case SDL_CONTROLLERBUTTONDOWN:
-				controller_state = GetState();
-				break;
-			
-			//case SDL_JOYAXISMOTION:
-			//	controller_state = GetState();
-			//	break;
+			switch (event.type)
+			{
+				case SDL_QUIT:
+					exit(0);
+					break;
+				case SDL_CONTROLLERBUTTONUP:
+				case SDL_CONTROLLERBUTTONDOWN:
+					//printf("Buttonpress\n");
+					controller_state = GetState();
+					SpecialControlHandler();
+					break;			
+				case SDL_CONTROLLERAXISMOTION:
+					controller_state = GetState();
+					break;
 				
-			case SDL_CONTROLLERAXISMOTION:
-				controller_state = GetState();
-				break;
-			
-			case SDL_JOYDEVICEADDED:
-				printf("Gamepad added\n");
-				RefreshGamepads();
-				break;
-			
-			case SDL_JOYDEVICEREMOVED:
-				printf("Gamepad removed\n");
-				RefreshGamepads();
-				break;
-			
-			default:
-				break;
+				case SDL_JOYDEVICEADDED:
+					printf("Gamepad added\n");
+					RefreshGamepads();
+					break;
+				case SDL_JOYDEVICEREMOVED:
+					printf("Gamepad removed\n");
+					RefreshGamepads();
+					break;
+				
+				default:
+					break;
+			}
 		}
 	}
 }
@@ -175,8 +185,32 @@ ChiakiControllerState IO::GetState()
 	return state;
 }
 
+void IO::SpecialControlHandler()
+{
+	///printf("SpecialControlHandler()\n");
+	
+	/// R3+Moon/Circle to Quit session
+	ChiakiControllerState kill_combo;  // can be set in Init or create.
+	chiaki_controller_state_set_idle(&kill_combo);
+	kill_combo.buttons |= CHIAKI_CONTROLLER_BUTTON_R3;
+	kill_combo.buttons |= CHIAKI_CONTROLLER_BUTTON_MOON;
+	if(controller_state.buttons == kill_combo.buttons) {
+		///printf("Kill Session - Restore Gui\n");
+		chiaki_session_stop(&this->host->session);		
+		host->gui->restoreGui();
+	}
+	
+	
+}
+
+void IO::ShutdownStreamDrm()
+{
+	drmprime_out_delete(dpo);
+}
+
+
 /// Set h264 or hevc here
-int IO::InitFFmpeg()
+int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door
 {	
 	printf("Begin InitFFmpeg\n");
 	
@@ -188,10 +222,7 @@ int IO::InitFFmpeg()
 	enum AVHWDeviceType type;
 	AVCodec *av_codec;  //rename 'decoder' ?
 	const char *codec_name = "h264_v4l2m2m";  /// or "hevc"
-	
-	/// debug
-    //output_file = fopen("outraw", "w+");
-	
+		
 	type = av_hwdevice_find_type_by_name(hw_decoder_name);
 	if(type == AV_HWDEVICE_TYPE_NONE)
 	{
@@ -200,10 +231,10 @@ int IO::InitFFmpeg()
 		return 1;
 	}
 	
-	dpo = drmprime_out_new();  // I think I need to nicely close this after!?
+	dpo = drmprime_out_new(drm_fd);  // I think I need to nicely close this after!?
     if (dpo == NULL) {
         fprintf(stderr, "Failed to open drmprime output\n");
-        return 1;
+        //return 1;
     }
 	
 	av_codec = avcodec_find_decoder_by_name(codec_name);
@@ -234,8 +265,8 @@ int IO::InitFFmpeg()
 	
 	/// Negotiating pixel format. Must return drm_prime
 	codec_context->get_format = get_hw_format;  /// was func: get_hw_format;
-	//[h264_v4l2m2m @ 0x1165d10] Format drm_prime chosen by get_format().
-	//[h264_v4l2m2m @ 0x1165d10] avctx requested=181 (drm_prime); get_format requested=181 (drm_prime)
+	///[h264_v4l2m2m @ 0x1165d10] Format drm_prime chosen by get_format().
+	///[h264_v4l2m2m @ 0x1165d10] avctx requested=181 (drm_prime); get_format requested=181 (drm_prime)
 
 	// check later if really needed?
 	codec_context->pix_fmt = AV_PIX_FMT_DRM_PRIME;   /* request a DRM frame */
@@ -247,16 +278,6 @@ int IO::InitFFmpeg()
 		return 1;
 	}
 	
-	
-		// glHevc does not need a hw_device_ctx  !?!?!?!?!
-		//~ if(av_hwdevice_ctx_create(&hw_device_ctx, type, nullptr, nullptr, 0) < 0)
-		//~ {
-			//~ CHIAKI_LOGE(&log, "Failed to create hwdevice context");
-			//~ //goto error_codec_context;
-			//~ return 1;
-		//~ }
-		//~ codec_context->hw_device_ctx = av_buffer_ref(hw_device_ctx);
-	
 	/// If you get 182 or other you are sourcing the wrong header file
 	printf("Actual Fmt: %d\n", codec_context->pix_fmt); // 181
 	
@@ -267,7 +288,7 @@ int IO::InitFFmpeg()
 	
 	printf("Finish InitFFmpeg\n");
 	return 0;
-	//return CHIAKI_ERR_SUCCESS;
+
 error_codec_context:
 	if(hw_device_ctx)
 		av_buffer_unref(&hw_device_ctx);
@@ -278,6 +299,13 @@ error_mutex:
 	return CHIAKI_ERR_UNKNOWN;
 }
 
+int IO::FiniFFmpeg()
+{
+	avcodec_close(codec_context);
+	avcodec_free_context(&codec_context);
+	//if(decoder->hw_device_ctx)
+	//	av_buffer_unref(&decoder->hw_device_ctx);
+}
 
 
 bool IO::VideoCB(uint8_t *buf, size_t buf_size)
@@ -297,9 +325,9 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
     if(&packet)
 	{
 		ret = avcodec_send_packet(codec_context, &packet);
-		// printf("Send Packet (sample_cb) return;  %d\n", r);
-		// In particular, we don't expect AVERROR(EAGAIN), because we read all
-		// decoded frames with avcodec_receive_frame() until done.
+		/// printf("Send Packet (sample_cb) return;  %d\n", r);
+		/// In particular, we don't expect AVERROR(EAGAIN), because we read all
+		/// decoded frames with avcodec_receive_frame() until done.
 		if (ret < 0) {
 		  printf("Error return in send_packet\n");
 	    }
@@ -316,9 +344,9 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
         }
 		
 		ret = avcodec_receive_frame(codec_context, frame); //ret 0 ==success
-		//printf("PIX Format after receive_frame:  %d\n", frame->format);//181, -1, 181, -1, etc
+		///printf("PIX Format after receive_frame:  %d\n", frame->format);//181
 		if (ret == 0) {
-			//printf("Frame Successfully Decoded\n");
+			///printf("Frame Successfully Decoded\n");
 			drmprime_out_display(dpo, frame);
 			this->mtx.unlock();
 		}
@@ -345,75 +373,6 @@ the_end:
 	
 	return 1;
 }
-
-
-
-//~ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
-//~ {
-	//~ ///printf("In VideoCB\n");
-	//~ ///printf("%d\n", buf_size);
-	
-	//~ AVPacket packet;
-	//~ av_init_packet(&packet);
-	//~ packet.data = buf;
-	//~ packet.size = buf_size;
-	//~ AVFrame *frame = NULL;//new
-	//~ int ret = 0;
-	
-	//~ this->mtx.lock();
-	//~ ///printf("Just before avcodec_send_packet()\n");
-    //~ ret = avcodec_send_packet(codec_context, &packet);
-    //~ if (ret < 0) {
-        //~ fprintf(stderr, "Error during decoding\n");
-        //~ return ret;
-    //~ }
-    //~ this->mtx.unlock();
-
-
-
-
-	//~ //printf("\nBEGIN chiaki_ffmpeg_decoder_pull_frame\n");
-	//~ this->mtx.lock();
-
-	//~ //AVFrame *frame = NULL;
-	//~ //int ret=-1;
-
-	
-        //~ if (!(frame = av_frame_alloc())) {
-            //~ fprintf(stderr, "Can not alloc frame\n");
-            //~ ret = AVERROR(ENOMEM);
-            //~ goto the_end;
-        //~ }
-		
-		//~ ret = avcodec_receive_frame(codec_context, frame); //ret 0 ==success
-		//~ //printf("PIX Format after receive_frame:  %d\n", frame->format);//181, -1, 181, -1, etc
-		//~ if (ret == 0) {
-			//~ printf("Frame Successfully Decoded\n");
-			//~ drmprime_out_display(dpo, frame);
-		//~ }
-		//~ if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-			//~ printf("AVERROR(EAGAIN)\n");
-			//~ av_frame_free(&frame);
-			//~ av_packet_unref(&packet);
-			//~ //return 0; /// goes sends/gets another packet.
-		//~ } else if (ret < 0) {
-			//~ fprintf(stderr, "Error while decoding\n");
-		//~ }
-
-		//~ //drmprime_out_display(dpo, frame);
-
-
-//~ the_end:
-	//~ this->mtx.unlock();
-	//~ //chiaki_mutex_unlock(&decoder->mutex);
-	//~ //printf("END chiaki_ffmpeg_decoder_pull_frame\n");
-	//~ av_frame_free(&frame);
-	//~ av_packet_unref(&packet);
-
-	
-	//~ return frame;
-//~ }
-
 
 void IO::InitAudioCB(unsigned int channels, unsigned int rate)
 {

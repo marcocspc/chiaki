@@ -24,27 +24,29 @@ extern "C"
 
 #define MAX_NUM_JOYSTICKS 2
 
-class Settings;
+#include "rpi/host.h"
+
 class Host;
+class Settings;
 
 class IO
 {
 	private:
-		//friend class Settings;
-		//friend class Host;
-		Host *host;
+		Host *host =nullptr;
+		
 		/// controllers
-		//SDL_Joystick *joysticks[MAX_NUM_JOYSTICKS];
-		SDL_GameController *gamecontrollers[MAX_NUM_JOYSTICKS];
+		
 		SDL_Haptic *haptics[MAX_NUM_JOYSTICKS];
 		int rumble[MAX_NUM_JOYSTICKS]; 	/// 2 -> play rumble
-		int connected; 					/// connected joysticks number
+		int connected; 
+							/// connected joysticks number
 		/// video
 		std::mutex mtx;
-		AVCodec *codec;
+		AVCodec *codec =nullptr;
 		AVCodecContext *codec_context;
-		AVFrame *frame;
-		drmprime_out_env_t *dpo;
+		AVFrame *frame =nullptr;
+		drmprime_out_env_t *dpo = NULL;
+		
 		/// Audio
 		SDL_AudioDeviceID sdl_audio_device_id = 0;
 
@@ -54,6 +56,7 @@ class IO
 		//Settings *settings = nullptr;
 		bool session_init = false;
 		//ChiakiSession session; // session in host
+		SDL_GameController *gamecontrollers[MAX_NUM_JOYSTICKS];
 		ChiakiControllerState controller_state;
 		
 		
@@ -63,9 +66,15 @@ class IO
 		int InitGamepads();
 		int RefreshGamepads();
 		void HandleJoyEvent(void);
+		void SpecialControlHandler();
 		ChiakiControllerState GetState();
 		
 		int InitFFmpeg();
+		int FiniFFmpeg();
+		int drm_fd;
+		bool takeInput=0;
+		void ShutdownStreamDrm();
+		void SwitchInputReceiver(std::string target);	/// gui/session
 		
 		void InitAudioCB(unsigned int channels, unsigned int rate);
 		bool VideoCB(uint8_t *buf, size_t buf_size);
