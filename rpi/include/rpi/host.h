@@ -7,7 +7,6 @@
 #include <vector>
 
 #include <chiaki/controller.h>
-#include <chiaki/discovery.h>
 #include <chiaki/log.h>
 #include <chiaki/opusdecoder.h>
 #include <chiaki/regist.h>
@@ -47,7 +46,7 @@ class Host
 {
 	private:
 		ChiakiConnectVideoProfile video_profile;
-		ChiakiDiscoveryService service;
+		
 		ChiakiAudioSink audio_sink; //needs to be pointer/persistent?
 		
 		/// REGISTERING
@@ -65,6 +64,7 @@ class Host
 		ChiakiOpusDecoder opus_decoder;
 		ChiakiTarget target = CHIAKI_TARGET_PS4_UNKNOWN;
 		std::string state = "";  /// standby, unknown, ready etc
+		ChiakiDiscoveryService *service;
 		ChiakiDiscoveryHost *discoveredHosts = nullptr;
 
 		ChiakiThread play_th;  ///should be private? but harder to do

@@ -268,7 +268,6 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door
 	///[h264_v4l2m2m @ 0x1165d10] Format drm_prime chosen by get_format().
 	///[h264_v4l2m2m @ 0x1165d10] avctx requested=181 (drm_prime); get_format requested=181 (drm_prime)
 
-	// check later if really needed?
 	codec_context->pix_fmt = AV_PIX_FMT_DRM_PRIME;   /* request a DRM frame */
     codec_context->coded_height = 720;
 	codec_context->coded_width = 1280;
@@ -346,7 +345,7 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 		ret = avcodec_receive_frame(codec_context, frame); //ret 0 ==success
 		///printf("PIX Format after receive_frame:  %d\n", frame->format);//181
 		if (ret == 0) {
-			///printf("Frame Successfully Decoded\n");
+			//printf("Frame Successfully Decoded\n");
 			drmprime_out_display(dpo, frame);
 			this->mtx.unlock();
 		}
@@ -360,7 +359,7 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 
    
 
-fail:
+fail:	/// this happens even without fail
 	av_frame_free(&frame);
 	av_packet_unref(&packet);
 	this->mtx.unlock();
@@ -418,6 +417,7 @@ void IO::InitAudioCB(unsigned int channels, unsigned int rate)
 void IO::AudioCB(int16_t *buf, size_t samples_count)
 {	
 	///printf("In AudioCB\n");
+	//printf("AudCB: %d\n", samples_count);
 	
 	for(int x = 0; x < samples_count * 2; x++)
 	{

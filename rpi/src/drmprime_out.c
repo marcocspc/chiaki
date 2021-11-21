@@ -473,6 +473,7 @@ int drmprime_out_display(drmprime_out_env_t *de, struct AVFrame *src_frame)
 
 void drmprime_out_delete(drmprime_out_env_t *de)
 {
+    printf("In drmprime_out_delete()\n ");
     de->q_terminate = 1;
     sem_post(&de->q_sem_in);
     pthread_join(de->q_thread, NULL);
@@ -480,16 +481,17 @@ void drmprime_out_delete(drmprime_out_env_t *de)
     sem_destroy(&de->q_sem_out);
 
     av_frame_free(&de->q_next);
-
-    if (de->drm_fd >= 0) {
-        close(de->drm_fd);
-        de->drm_fd = -1;
-    }
+    
+    /// Disabled as I hand fd back to SDL2
+    //~ if (de->drm_fd >= 0) {
+        //~ close(de->drm_fd);
+        //~ de->drm_fd = -1;
+    //~ }
 
     free(de);
 }
 
-drmprime_out_env_t* drmprime_out_new()
+drmprime_out_env_t* drmprime_out_new(int borrowed_fd)
 {
     int rv;
     drmprime_out_env_t* const de = calloc(1, sizeof(*de));
@@ -503,12 +505,15 @@ drmprime_out_env_t* drmprime_out_new()
     de->setup = (struct drm_setup) { 0 };
     de->q_terminate = 0;
     de->show_all = 1;
+    
+    /// Using the borrowed fd instead
+    //~ if ((de->drm_fd = drmOpen(drm_module, NULL)) < 0) {
+        //~ rv = AVERROR(errno);
+        //~ fprintf(stderr, "Failed to drmOpen %s: %s\n", drm_module, av_err2str(rv));
+        //~ goto fail_free;
+    //~ }
 
-    if ((de->drm_fd = drmOpen(drm_module, NULL)) < 0) {
-        rv = AVERROR(errno);
-        fprintf(stderr, "Failed to drmOpen %s: %s\n", drm_module, av_err2str(rv));
-        goto fail_free;
-    }
+    de->drm_fd = borrowed_fd;
 
     if (find_crtc(de->drm_fd, &de->setup, &de->con_id) != 0) {
         fprintf(stderr, "failed to find valid mode\n");

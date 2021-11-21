@@ -3,7 +3,7 @@
 
 #include <SDL2/SDL.h>
 //#include <SDL2/SDL_opengl.h>
-//#include <SDL2/SDL_opengles2.h>
+#include <SDL2/SDL_opengles2.h>
 
 
 #include <sdlgui/screen.h>
@@ -155,8 +155,12 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user);
 class RpiHostIcon : public sdlgui::Button, public Interface
 {
 	public:
-		RpiHostIcon(sdlgui::Widget *parent, const char* label);
+		RpiHostIcon(sdlgui::Widget *parent, const char* label, NanoSdlWindow* gui_object);
 		~RpiHostIcon();
+		
+		void hostClick();
+		
+		NanoSdlWindow *gui_object;
 			
 	private:
 };
@@ -164,7 +168,7 @@ class RpiHostIcon : public sdlgui::Button, public Interface
 class RpiSettingsWidget : public sdlgui::Button, public Interface
 {
 	public:
-		RpiSettingsWidget(sdlgui::Widget *parent, std::vector<std::string> options, NanoSdlWindow* gui_object);
+		RpiSettingsWidget(sdlgui::Widget *parent, std::vector<std::string> options, NanoSdlWindow* gui_object, std::string setting_name);
 		~RpiSettingsWidget();
 		
 		void Highlight();
@@ -175,6 +179,7 @@ class RpiSettingsWidget : public sdlgui::Button, public Interface
 		
 		NanoSdlWindow *gui_object;
 		sdlgui::Popup *pop = nullptr;
+		std::string setting_name;
 	
 	private:
 		sdlgui::Theme *focused_theme;
@@ -187,6 +192,9 @@ class NanoSdlWindow : public sdlgui::Screen
 	public:
 		NanoSdlWindow(SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* sdl_renderer);
 		~NanoSdlWindow();
+		Host *host = nullptr; 	/// controller state, session
+		IO *io = nullptr;	    /// input, decode, rendering, audio
+		
 		bool start();
 		int hostClick();
 		void registClick();
@@ -209,6 +217,9 @@ class NanoSdlWindow : public sdlgui::Screen
 		sdlgui::Window *settings_win;
 		Interface* current_widget;  // make this regular type, not struct
 		
+		Theme *window_theme;
+		Theme *settings_theme;
+		GridLayout *vert_group;
 		RpiSettingsWidget *db1;
 		RpiSettingsWidget *db2;
 		RpiSettingsWidget *db3;
@@ -217,15 +228,13 @@ class NanoSdlWindow : public sdlgui::Screen
 		
 
 	private:
-		Host *host = nullptr; 	/// controller state, session
-		IO *io = nullptr;	    /// input, decode, rendering, audio
 		ChiakiLog log;
 		
 		/// Widgets
 		sdlgui::Window *top_win;
 		sdlgui::BoxLayout *top_box_horizontal;
 		sdlgui::BoxLayout *box_vertical;
-		sdlgui::Button *host_icon;
+		RpiHostIcon *host_icon;
 		std::vector<sdlgui::Button*>  hosts_widgets;
 		//std::vector<RpiSettingsWidget*>  settings_widgets;
 		

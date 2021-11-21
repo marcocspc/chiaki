@@ -88,10 +88,7 @@ int main()
 	/// GUI start
 	NanoSdlWindow *screen = new NanoSdlWindow(sdl_window, WinWidth, WinHeight, sdl_renderer);
 	screen->start();
-	while(1) {
-		printf("eh\n");
-		sleep(1);
-	}
+	//while(1)SDL_Delay(1000);
 	
 	/// Finish
 	//ProfilerStop();

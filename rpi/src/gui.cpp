@@ -16,22 +16,33 @@ typedef int32_t i32;
 typedef uint32_t u32;
 typedef int32_t b32;
 
-
-RpiHostIcon::RpiHostIcon(Widget *parent, const char* label)
-	: Button(parent, label, 0)
+RpiHostIcon::RpiHostIcon(Widget *parent, const char* label, NanoSdlWindow* gui_object)
+	: Button(parent, label, [this] { hostClick(); })
 {	
-
+	this->gui_object = gui_object;
+	this->setFixedSize(Vector2i(200, 200));
+	std::string a = gui_object->settings->all_host_settings.at(0).isPS5;
+	this->label("Is PS5:   " + a).setPosition(Vector2i(240, 180));
+	std::string b = gui_object->settings->all_host_settings.at(0).nick_name;
+	this->label("Nick Name:   " + b).setPosition(Vector2i(240, 200));
 }
 
 RpiHostIcon::~RpiHostIcon()
 {
 }
 
-RpiSettingsWidget::RpiSettingsWidget(sdlgui::Widget *parent, std::vector<std::string> options, NanoSdlWindow* gui_object)
+void RpiHostIcon::hostClick()
+{	
+	printf("Host Click\n");
+	gui_object->hostClick();
+}
+
+RpiSettingsWidget::RpiSettingsWidget(sdlgui::Widget *parent, std::vector<std::string> options, NanoSdlWindow* gui_object, std::string setting_name)
 	: Button(parent, options.at(0), [this] { OnClick(); })
 {	
 	this->gui_object = gui_object;
 	allOptions = options;
+	this->setting_name = setting_name;
 	setFontSize(18);
 	setTextColor(Color(200,200,200,255));
 }
@@ -72,7 +83,7 @@ void RpiSettingsWidget::OnClick()
 	for(std::string l : allOptions)
 	{
 		std::vector<std::string> tmpStr = {l};
-		RpiSettingsWidget *tmp = new RpiSettingsWidget(pop, tmpStr, gui_object);  /// parent is caller button
+		RpiSettingsWidget *tmp = new RpiSettingsWidget(pop, tmpStr, gui_object, "null");  /// parent is caller button
 		tmp->setCallback([this, tmp] { OnChoiceClick(tmp); } ); /// seems always need 'this' as well
 		tmp->setFixedSize(Vector2i(160, 30));
 		option_widgets.push_back(tmp);
@@ -108,8 +119,12 @@ void RpiSettingsWidget::OnChoiceClick(RpiSettingsWidget* choice)
 	this->setCaption(choice->caption());  		/// confusing but 'this' is the originator button
 	choice->parent()->setVisible(false);  		/// hide choice menu
 	this->gui_object->current_widget = this;	/// set current widget back to originator
-	this->Highlight();					        /// highlight it
+	this->Highlight();				        	/// highlight it
+
+	/// Save new setting to memory and file
+	this->gui_object->settings->RefreshSettings(this->setting_name, choice->caption());
 }
+
 
 void RpiSettingsWidget::Highlight()
 {	
@@ -134,15 +149,29 @@ NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_
     sdl_window = pwindow;
     sdl_renderer = renderer;
     u32 WindowFlags = SDL_WINDOW_OPENGL; /// added  | SDL_WINDOW_FULLSCREEN
+    
+    
+    /// not sure where the best place for this is?
+	host = new Host;
+	io = new IO;
+	host->gui = this;	/// connect up
+	int ret;
+	ret = io->Init(host);
+	ret = host->Init(io);
+	ret = io->InitGamepads();
 
+	settings = new RpiSettings();
+	settings->ReadYaml();
+		
+		
 	/// Nanogui
-	Theme *window_theme = new Theme(sdl_renderer);
+	window_theme = new Theme(sdl_renderer);
 	window_theme->mWindowDropShadowSize = 0;
 	window_theme->mWindowHeaderHeight = 0;
 	window_theme->mWindowFillUnfocused = Color(128,0,64,255);
     window_theme->mWindowFillFocused = Color(128,0,64,255);
     
-    Theme *settings_theme = new Theme(sdl_renderer);
+    settings_theme = new Theme(sdl_renderer);
 	settings_theme->mWindowDropShadowSize = 0;
 	settings_theme->mWindowHeaderHeight = 0;
 	settings_theme->mWindowFillUnfocused = Color(0,180,90,255);
@@ -171,8 +200,8 @@ NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_
 	top_win->setLayout(top_box_horizontal);
 	///settings_win->center();
 
-	host_icon = new Button(top_win, " - - - ", [this] { hostClick(); });
-	host_icon->setFixedSize(Vector2i(200, 200));
+	//host_icon = new RpiHostIcon(top_win, " - - - ", [this] { hostClick(); });
+	host_icon = new RpiHostIcon(top_win, " - - - ", this);
 	hosts_widgets.push_back(host_icon);
 	//host_icon->setPosition(Vector2i(800, 300));
 	//hosts_grid->setAnchor(host_icon, AdvancedGridLayout::Anchor(1, 0, 1, 1, Alignment::Middle, Alignment::Middle));
@@ -186,42 +215,47 @@ NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_
 	//AdvancedGridLayout *settings_grid = new AdvancedGridLayout(cols, rows, 0);
 	//AdvancedGridLayout::Anchor settings_anchor(1, 0, 1, 1, Alignment::Middle, Alignment::Middle);
 
-	
+
 	/// Lower Window for settings widgets
 	settings_win = new Window(this, "");
 	//settings_win->setFixedSize(Vector2i(screenSize.x, screenSize.y*0.5));
 	settings_win->setPosition(Vector2i(0, screenSize.y*0.5));
 	settings_win->setTheme(settings_theme);
 
-	GridLayout *vert_group = new GridLayout(Orientation::Horizontal, 2, Alignment::Middle, 10, 10); /// defaults to two columns
+	vert_group = new GridLayout(Orientation::Horizontal, 2, Alignment::Middle, 10, 10); /// defaults to two columns
 	settings_win->setLayout(vert_group);
 
 	settings_win->label("Decoder: ").setFontSize(20);
-	db1 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "V4L2-DRM", "MMAL" }, this);
+	db1 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "v4l2-drm", "mmal" }, this, "decoder");
+	db1->setCaption(settings->all_host_settings.at(0).sess.decoder);
 	db1->setFixedWidth(200);
 	//settings_grid->setAnchor(db1, settings_anchor);
 
 
 	settings_win->label("Video Codec: ").setFontSize(20);
-	db2 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "Automatic" ,"h264", "h265" }, this);
+	db2 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "automatic" ,"h264", "h265" }, this, "codec");
+	db2->setCaption(settings->all_host_settings.at(0).sess.codec);
 	db2->setFixedWidth(200);
 	//settings_grid->setAnchor(db2, settings_anchor);
 
 
 	settings_win->label("Resolution: ").setFontSize(20);
-	db3 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "1080" ,"720", "540"}, this);
+	db3 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "1080" ,"720", "540"}, this, "resolution");
+	db3->setCaption(settings->all_host_settings.at(0).sess.resolution);
 	db3->setFixedWidth(200);
 	//settings_grid->setAnchor(db3, settings_anchor);
 
 
 	settings_win->label("Framerate: ").setFontSize(20);
-	db4 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "60" ,"30"}, this);
+	db4 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "60" ,"30"}, this, "fps");
+	db4->setCaption(settings->all_host_settings.at(0).sess.fps);
 	db4->setFixedWidth(200);
 	//settings_grid->setAnchor(db4, settings_anchor);
 
 
 	settings_win->label("Audio Device: ").setFontSize(20);
-	db5 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "HDMI" ,"Jack", "aoaoao"}, this);	
+	db5 = new RpiSettingsWidget(settings_win, std::vector<std::string>{ "hdmi" ,"jack", "aoaoao"}, this, "audio");
+	db5->setCaption(settings->all_host_settings.at(0).sess.audio_device);
 	db5->setFixedWidth(200);
 	//settings_grid->setAnchor(db5, settings_anchor);
 
@@ -240,25 +274,31 @@ NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_
 	current_widget = db1;
 	//SDL_ShowCursor(0);
 
-	/// not sure where the best place for this is?
-	host = new Host;
-	io = new IO;
-	host->gui = this;	/// connect up
-
-	int ret;
-	ret = io->Init(host);
-	ret = host->Init(io);
-	ret = io->InitGamepads();
-
-	settings = new RpiSettings();
-	settings->ReadYaml();
-
 	ret = host->StartDiscoveryService();
+	
+	
+	
+	
+	
+	//~ SDL_RenderClear(sdl_renderer);
+    //~ this->drawAll();
+    //~ // Render the rect to the screen
+    //~ SDL_RenderPresent(sdl_renderer);
+    //~ SDL_GL_SwapWindow(sdl_window);
+    
+    	//~ ret = io->InitFFmpeg();
+		//~ //sleep(1);	/// some time is needed here, was 1 
+		//~ SDL_Delay(1000);
+		//~ host->StartSession();
+		//~ //io->SwitchInputReceiver(std::string("session"));
+		//~ //setClientState("playing");
+
 }
 
 
 NanoSdlWindow::~NanoSdlWindow()
 {
+	printf("NanoSdlWindow destroyed\n");
 }
 
 /// This is the GUI main loop
@@ -267,7 +307,7 @@ bool NanoSdlWindow::start()
 	SDL_Event event;
 	while (running)
 	{
-		SDL_Delay(8);///ms
+		SDL_Delay(14);///ms
 		
 		if(takeInput)
 		{
@@ -386,19 +426,15 @@ bool NanoSdlWindow::start()
 
 void NanoSdlWindow::RefreshScreenDraw()
 {
-	//orig
-    //glViewport(0, 0, WinWidth, WinHeight);
-    //glClearColor(0.1, 0.0, 0.1, 0.0);
-    //glClear(GL_COLOR_BUFFER_BIT);
+    //~ glViewport(0, 0, WinWidth, WinHeight);
+    //~ glClearColor(0.1, 0.0, 0.1, 0.0);
+    //~ glClear(GL_COLOR_BUFFER_BIT);
     
-    //nano
+    
     SDL_RenderClear(sdl_renderer);
-        
     this->drawAll();
     // Render the rect to the screen
     SDL_RenderPresent(sdl_renderer);
-  
-    //orig
     SDL_GL_SwapWindow(sdl_window);
 	
 }
@@ -492,7 +528,7 @@ int NanoSdlWindow::hostClick()
 		io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
 				
 		ret = io->InitFFmpeg();
-		sleep(1);	/// some time is needed here, was 1 
+		//sleep(1);	/// some time is needed here, was 1 
 		host->StartSession();
 		io->SwitchInputReceiver(std::string("session"));
 		setClientState("playing");
@@ -547,7 +583,7 @@ bool NanoSdlWindow::keyboardEvent(int key, int scancode, int action, int modifie
 	return false;
 }
 
-/// Think I need an Interface here
+
 /// 1=North, 2=South, 3=West, 4=East
 void NanoSdlWindow::moveFocus(int direction)
 {
@@ -580,7 +616,7 @@ void NanoSdlWindow::restoreGui()
 	io->ShutdownStreamDrm(); /// good. clears stream frame buffer
 	
 	SDL_MaximizeWindow(sdl_window);
-	host->StartDiscoveryService();
+	host->StartDiscoveryService();  /// Did I ever stop it?
 	io->SwitchInputReceiver(std::string("gui"));
 
 }

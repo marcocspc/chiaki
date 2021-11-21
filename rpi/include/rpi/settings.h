@@ -17,6 +17,7 @@
 #include <pwd.h>
 
 #include <chiaki/base64.h>
+#include <chiaki/session.h>
 
 //~ using std::cout;
 //~ using std::endl;
@@ -28,8 +29,7 @@
 
 
 std::string GetValueForToken(std::string line, std::string token);
-//std::vector<std::string> ReadRpiSettings();
-std::vector<char> KeyStr2ByteArray(std::string in_str);
+//std::vector<char> KeyStr2ByteArray(std::string in_str);
 
 struct rpi_settings_session {
 	std::string decoder;
@@ -40,6 +40,7 @@ struct rpi_settings_session {
 };
 
 struct rpi_settings_host{
+	std::string isPS5;
 	std::string nick_name;
 	std::string id; //mac or id?
 	std::string rp_key;
@@ -56,7 +57,12 @@ class RpiSettings
 		void ReadYaml();	/// reads into 'all_host_settings'
 		void WriteYaml(std::vector<rpi_settings_host> all_host_settings);
 		void PrintHostSettings(rpi_settings_host host);
+		void RefreshSettings(std::string setting, std::string choice);  /// both memory and file
+		ChiakiCodec GetChiakiCodec(std::string choice);
+		ChiakiVideoResolutionPreset GetChiakiResolution(std::string choice);
+		ChiakiVideoFPSPreset GetChiakiFps(std::string choice);
 		
+		std::vector<std::string> sessionSettingsNames;
 		std::vector<rpi_settings_host> all_host_settings;
 	
 	private:

@@ -7,6 +7,7 @@ using namespace std;
 
 
 //char key_bytes_out[16] = {};
+// OLD NOT USED?
 std::vector<char> KeyStr2ByteArray(std::string in_str) {
 
 	std::vector<char> key_bytes_out;
@@ -95,6 +96,11 @@ std::string GetValueForToken(std::string line, std::string token)
 
 RpiSettings::RpiSettings()
 {
+	sessionSettingsNames.push_back("decoder");
+	sessionSettingsNames.push_back("codec");
+	sessionSettingsNames.push_back("resolution");
+	sessionSettingsNames.push_back("fps");
+	sessionSettingsNames.push_back("audio");
 }
 
 RpiSettings::~RpiSettings()
@@ -112,6 +118,7 @@ void RpiSettings::PrintHostSettings(rpi_settings_host host1)
 	int hostN=1;
 	cout << "regist_hosts:" << endl;
 		cout << tab1; cout << "- host: " 		<< hostN << endl;
+			cout << tab2; cout << "isPS5: " 	<< host1.isPS5 << endl;
 			cout << tab2; cout << "nick: " 		<< host1.nick_name << endl;
 			cout << tab2; cout << "id: " 		<< host1.id << endl;
 			cout << tab2; cout << "rp_key: " 	<< host1.rp_key << endl;
@@ -125,17 +132,95 @@ void RpiSettings::PrintHostSettings(rpi_settings_host host1)
 
 }
 
+// Only works for Single Host ATM
+void RpiSettings::RefreshSettings(std::string setting, std::string choice)
+{
+	printf("Refreshing:  %s : %s\n", setting.c_str(), choice.c_str());
+	
+	if(setting == "decoder") {
+		all_host_settings.at(0).sess.decoder = choice;
+	}
+	
+	if(setting =="codec") {
+		all_host_settings.at(0).sess.codec = choice;
+	}
+	
+	if(setting =="resolution") {
+		all_host_settings.at(0).sess.resolution = choice;
+	}
+	
+	if(setting =="fps") {
+		all_host_settings.at(0).sess.fps = choice;
+	}
+	
+	if(setting =="audio") {
+		all_host_settings.at(0).sess.audio_device = choice;
+	}
+
+	WriteYaml(all_host_settings);
+}
+
+	// values must not change
+	//~ CHIAKI_CODEC_H264 = 0,
+	//~ CHIAKI_CODEC_H265 = 1,
+	//~ CHIAKI_CODEC_H265_HDR = 2
+//~ } ChiakiCodec;
+ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice)
+{	
+	bool isPS5 = false;
+	if(all_host_settings.at(0).isPS5 == "1") isPS5 = true;
+		
+	if(choice == "automatic" && isPS5)
+		return CHIAKI_CODEC_H265;
+	else if(choice == "automatic")
+		return CHIAKI_CODEC_H264;
+	
+	if(choice == "h264") return CHIAKI_CODEC_H264;
+	
+	if(choice == "h265" && isPS5) return CHIAKI_CODEC_H265;
+	else return CHIAKI_CODEC_H264;
+	
+}
+
+//~ typedef enum {
+	//~ // values must not change
+	//~ CHIAKI_VIDEO_RESOLUTION_PRESET_360p = 1,
+	//~ CHIAKI_VIDEO_RESOLUTION_PRESET_540p = 2,
+	//~ CHIAKI_VIDEO_RESOLUTION_PRESET_720p = 3,
+	//~ CHIAKI_VIDEO_RESOLUTION_PRESET_1080p = 4
+//~ } ChiakiVideoResolutionPreset;
+ChiakiVideoResolutionPreset RpiSettings::GetChiakiResolution(std::string choice)
+{
+	bool isPS5 = false;
+	if(all_host_settings.at(0).isPS5 == "1") isPS5 = true;
+	
+	if(choice == "540") return CHIAKI_VIDEO_RESOLUTION_PRESET_540p;
+	
+	if(choice == "720") return CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
+	
+	if(choice == "1080" && isPS5) return CHIAKI_VIDEO_RESOLUTION_PRESET_1080p;
+	else return CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
+}
+
+//~ typedef enum {
+	//~ // values must not change
+	//~ CHIAKI_VIDEO_FPS_PRESET_30 = 30,
+	//~ CHIAKI_VIDEO_FPS_PRESET_60 = 60
+//~ } ChiakiVideoFPSPreset;
+ChiakiVideoFPSPreset RpiSettings::GetChiakiFps(std::string choice)
+{	
+	if(choice == "30") return CHIAKI_VIDEO_FPS_PRESET_30;
+	else return CHIAKI_VIDEO_FPS_PRESET_60;
+}
+
+
 /// not using actual libyaml to write. Seemed too complicated.
 /// re-writing the full file at once from current settings in memory.
 void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
 {
-	//const char* filename = "testyaml.yaml";
-	
 	std::string filename("/home/");
 	filename.append(getenv("USER"));
 	filename.append("/.config/Chiaki/Chiaki_rpi.conf");
-
-	printf("Will try to read rpi settings file: %s\n", filename.c_str());
 		
 	ofstream out(filename);
 	if (!out.is_open()) {
@@ -162,6 +247,7 @@ void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
 	/// hosts
 	out << "regist_hosts:" << endl;
 		out << tab1; out << "- host: " 		<< hostN << endl;
+			out << tab2; out << "isPS5: " 	<< host1.isPS5 << endl;
 			out << tab2; out << "nick: "	<< host1.nick_name << endl;
 			out << tab2; out << "id: " 		<< host1.id << endl;
 			out << tab2; out << "rp_key: "  << host1.rp_key << endl;
@@ -171,7 +257,7 @@ void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
 				out << tab3; out << "codec: " 		<< host1.sess.codec << endl;
 				out << tab3; out << "resolution: "  << host1.sess.resolution << endl;
 				out << tab3; out << "fps: " 		<< host1.sess.fps << endl;
-				out << tab3; out << "audio: " 		<< host1.sess.audio_device << endl;
+				out << tab3; out << "audio_device: "<< host1.sess.audio_device << endl;
 
 
 	/// Finish
@@ -221,6 +307,9 @@ void RpiSettings::ReadYaml()
 		if(ret != "") n_hosts++;
 		
 		/// Host settings
+		ret = GetValueForToken(s, "isPS5");
+		if(ret != "") bufHost.isPS5 = ret;
+		
 		ret = GetValueForToken(s, "nick");
 		if(ret != "") bufHost.nick_name = ret;
 		
@@ -246,7 +335,7 @@ void RpiSettings::ReadYaml()
 		ret = GetValueForToken(s, "fps");
 		if(ret != "") bufHost.sess.fps = ret;
 		
-		ret = GetValueForToken(s, "audio");
+		ret = GetValueForToken(s, "audio_device");
 		if(ret != "") bufHost.sess.audio_device = ret;
 	}
 	
