@@ -1,5 +1,6 @@
 #include <bitset> // test qbytestream
 //#include <cstring>
+#include <string>
 
 #include <rpi/host.h>
 #include "rpi/settings.h"
@@ -17,7 +18,6 @@
 static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 {
 	printf("In  host RegistEventCB\n");
-	// not sure if the Gui should be doing this
 	Host *host = (Host *)user;
 	//host->RegistCB(event);
 	
@@ -37,20 +37,28 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 			memcpy(regist_key, r_host->rp_regist_key, sizeof(regist_key));
 			std::string regist_key_str(regist_key);
 			printf("Regist Key:  %s\n", regist_key);
-			
-			
-			/// uint8_t rp_key[0x10] = {0};
-			/// std::string Host::GetHostRPKey(Host *host)
-			/// memcpy(rp_key, r_host->rp_key, sizeof(rp_key));
-			
-			/// 8WD4B1ycVIJ6GAW5vIDKFQ==  
+
 			std::string rp_key_str = host->GetHostRPKey(r_host->rp_key);
 			printf("GetHostRPKey: %s\n", rp_key_str.c_str());
 			
-			/// Save to settings file 
+			/// Save out to settings file 
 			// Only host[0] for now
-			host->gui->settings->all_host_settings.at(0).regist = regist_key_str;
-			host->gui->settings->all_host_settings.at(0).rp_key = rp_key_str;
+			int i=0;
+			ChiakiDiscoveryHost *dh = host->discoveredHosts+i;
+			rpi_settings_host new_host;
+			new_host.sess.decoder = "v4l2-drm";
+			new_host.sess.codec = "automatic";
+			new_host.sess.resolution = "1080";
+			new_host.sess.fps = "60";
+			new_host.sess.audio_device = "hdmi";
+			int ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(dh));//ChiakiDiscoveryHost
+			new_host.isPS5 = std::to_string(ps5);
+			new_host.nick_name = dh->host_name;
+			new_host.id = dh->host_id; /// mac
+			new_host.rp_key = rp_key_str;
+			new_host.regist = regist_key;
+			
+			host->gui->settings->all_host_settings.push_back(new_host);
 			host->gui->settings->WriteYaml(host->gui->settings->all_host_settings);
 			
 			// Not correct! Needs to be Discovered's state
@@ -81,9 +89,11 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 {
 	printf("In Discovery()\n");
 	Host *host = (Host *)user;
-
 	/// This triggers again after first time need to filter
 	host->discoveredHosts = discovered_hosts;
+
+	/// Should be, for each discovery ,iterate the settings hosts.
+	///
 
 	// Needs to be expanded to multi host
 	host->state = chiaki_discovery_host_state_string(discovered_hosts->state);
@@ -106,51 +116,57 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 	//~ std::string rp_key;
 	//~ std::string regist;
 	
-	/// IF hosts settings are empty (so nothing was read from file earlier)
-	/// We just add this found one straight away.
-	if(host->gui->settings->all_host_settings.size() == 0)
+	/// If read settings are empty (so nothing was read from file earlier)
+	/// [N]
+	if(host->gui->settings->all_read_settings.size() == 0)
 	{	
 		printf("No Hosts found in file\n");
-		rpi_settings_host new_host;
-		new_host.isPS5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(discovered_hosts));
-		new_host.nick_name = discovered_hosts->host_name;
-		new_host.id = discovered_hosts->host_id;
-	
-		/// The others added at Regist time
-		
-		/// Update text info next to Icon
-			
-		/// Also add default Session settings
-		new_host.sess.decoder = "v4l2-drm";
-		new_host.sess.codec   = "automatic";
-		new_host.sess.resolution = "1080";
-		new_host.sess.fps = "60";
-		new_host.sess.audio_device = "hdmi"; 
-		
-		std::vector<rpi_settings_host> all_host_settings;
-		all_host_settings.push_back(new_host);
-		host->gui->settings->WriteYaml(all_host_settings);
-		
 		host->gui->setClientState(std::string("notreg"));
-		printf("Wrote initial host settings to file\n");
 	}
-	else /// hosts were found in settings
+	else /// [Y] - some hosts were found in settings (but are they this?)
 	{
 		for(int i=0; i<hosts_count; i++) /// for each Discovered host
 		{
 			ChiakiDiscoveryHost *dh = host->discoveredHosts+i;
-			for(rpi_settings_host sh : host->gui->settings->all_host_settings) /// each host in settings file
+			
+			/// iterate read-hosts
+			for(rpi_settings_host sh : host->gui->settings->all_read_settings)
 			{
-				if(sh.regist == "") { /// means discovered is not registered
-					printf("Host needs to be registered!\n");
-					host->gui->setClientState(std::string("notreg"));
-					return;
-				} else {/// it is registered already
-					// Needs to get actual discovered's State 
-					std::string state = chiaki_discovery_host_state_string(dh->state);
-					host->gui->setClientState(state);
-				}
+				/// Look for the 'id' in file, compare
+				if(sh.id == dh->host_id)
+				{
+					printf("Discovery ID match\n");
+					/// if id's match, check if theres a 'regist' entry?
+					if(sh.regist == "") { /// NO not registered
+						host->gui->setClientState(std::string("notreg"));
+						return;
+					} else { /// YES, found+registered
+						/// set Status to Ready or Orange
+						std::string state = chiaki_discovery_host_state_string(dh->state);
+						host->gui->setClientState(state);
+						/// copy this read-host to the active host list
+						// lets do this with a checking function to not double up or append existing data
+						host->gui->settings->all_validated_settings.push_back(sh);
+						/// update host settings gui
+						host->gui->UpdateSettingsGui();
+						
+					}
+				}///END id match
 			}
+			
+			/// OLD
+			//~ for(rpi_settings_host sh : host->gui->settings->all_host_settings) /// each host in settings file
+			//~ {
+				//~ if(sh.regist == "") { /// means discovered is not yet registered
+					//~ printf("Host needs to be registered!\n");
+					//~ host->gui->setClientState(std::string("notreg"));
+					//~ return;
+				//~ } else {/// it is registered already
+					//~ // Needs to get actual discovered's State 
+					//~ std::string state = chiaki_discovery_host_state_string(dh->state);
+					//~ host->gui->setClientState(state);
+				//~ }
+			//~ }
 		}
 
 	}
@@ -269,6 +285,8 @@ void Host::RegistStart(std::string accountID, std::string pin)
 
 	RpiSettings settings;
 	accId_len =  settings.GetB64encodeSize(accountID.length());
+	
+	printf("AccID entered:  %s\n", accountID.c_str());
 
 	ChiakiErrorCode err = chiaki_base64_decode(
 			accountID.c_str(), accountID.length(),
@@ -352,10 +370,10 @@ int Host::StartSession()
 	connect_info.ps5 = isPS5;
 	connect_info.video_profile_auto_downgrade = false;
 	connect_info.enable_keyboard = false;
-	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(gui->settings->all_host_settings.at(0).sess.codec);
-	//ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(gui->settings->all_host_settings.at(0).sess.resolution);
-	ChiakiVideoResolutionPreset resolution_preset = CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
-	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(gui->settings->all_host_settings.at(0).sess.fps);
+	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(gui->settings->all_validated_settings.at(0).sess.codec);
+	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(gui->settings->all_validated_settings.at(0).sess.resolution);
+	//ChiakiVideoResolutionPreset resolution_preset = CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
+	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(gui->settings->all_validated_settings.at(0).sess.fps);
 	chiaki_connect_video_profile_preset(&connect_info.video_profile, resolution_preset, fps_preset);
 	connect_info.video_profile.bitrate = 15000;
 

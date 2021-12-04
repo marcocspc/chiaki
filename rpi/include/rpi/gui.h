@@ -2,34 +2,22 @@
 #define RPI_GUI_H
 
 #include <SDL2/SDL.h>
+#include <SDL.h>
 //#include <SDL2/SDL_opengl.h>
 #include <SDL2/SDL_opengles2.h>
 
+#include "imgui.h"
+#include "imgui_impl_sdl.h"
+#include "imgui_impl_opengl3.h"
 
-#include <sdlgui/screen.h>
-#include <sdlgui/window.h>
-#include <sdlgui/layout.h>
-#include <sdlgui/label.h>
-//#include <sdlgui/checkbox.h>
-#include <sdlgui/button.h>
-#include <sdlgui/toolbutton.h>
-#include <sdlgui/popupbutton.h>
-#include <sdlgui/combobox.h>
-#include <sdlgui/dropdownbox.h>
-//#include <sdlgui/progressbar.h>
-#include <sdlgui/entypo.h>
-#include <sdlgui/messagedialog.h>
-#include <sdlgui/textbox.h>
-//#include <sdlgui/slider.h>
-#include <sdlgui/imagepanel.h>
-#include <sdlgui/imageview.h>
-//#include <sdlgui/vscrollpanel.h>
-//#include <sdlgui/colorwheel.h>
-//#include <sdlgui/graph.h>
-//#include <sdlgui/tabwidget.h>
-//#include <sdlgui/switchbox.h>
-#include <sdlgui/formhelper.h>
+// version error
+// /home/pi/dev/chiaki_v4l2/third-party/imgui/imgui_internal.h:267:25: error: missing binary operator before token "defined"
+//  #elif defined(__GNUC__) defined(__arm__) && !defined(__thumb__)
+// should be
+//  #elif defined(__GNUC__) && defined(__arm__) && !defined(__thumb__)
 
+#include <string>
+#include <stdio.h>
 
 #include <chiaki/log.h>
 #include "chiaki/regist.h"
@@ -37,32 +25,9 @@
 
 #include "rpi/settings.h"
 
-/// instead of full std namespace
 using std::cout;
 using std::cerr;
 using std::endl;
-
-//using namespace sdlgui;
-using sdlgui::Widget;
-using sdlgui::Window;
-using sdlgui::Button;
-using sdlgui::BoxLayout;
-using sdlgui::Vector2i;
-using sdlgui::GridLayout;
-using sdlgui::Alignment;
-using sdlgui::Label;
-using sdlgui::DropdownBox;
-using sdlgui::Theme;
-using sdlgui::Color;
-using sdlgui::Orientation;
-using sdlgui::TextBox;
-using sdlgui::PopupButton;
-using sdlgui::Popup;
-using sdlgui::Cursor;	/// I edited in in sdlgui/common.h, clashes with /usr/include/X11/X.h  
-
-using sdlgui::ToolButton;
-using sdlgui::AdvancedGridLayout;
-using sdlgui::GroupLayout;
 
 /// ----------------------------------------------------------------------------------------
 //#include <SDL_syswm.h> /// Below section is instead of this
@@ -123,71 +88,10 @@ extern DECLSPEC SDL_bool SDLCALL SDL_GetWindowWMInfo(SDL_Window * window,
 #endif
 ///-------------------------------------------------------------------------
 
-class NanoSdlWindow;
 class Host;
 class IO;
 
-class Interface
-{
-	public:
-		Interface *NorthNeighbour;
-		Interface *SouthNeighbour;
-		Interface *WestNeighbour;
-		Interface *EastNeighbour;
-		virtual void Highlight() {};
-		virtual void Reset() {};
-		
-	
-	private:
-	
-};
-
-struct CurrentWidget {
-
-	Interface* widget=nullptr;
-};
-
-
-
-
-static void RegistEventCB(ChiakiRegistEvent *event, void *user);
-
-class RpiHostIcon : public sdlgui::Button, public Interface
-{
-	public:
-		RpiHostIcon(sdlgui::Widget *parent, const char* label, NanoSdlWindow* gui_object);
-		~RpiHostIcon();
-		
-		void hostClick();
-		
-		NanoSdlWindow *gui_object;
-			
-	private:
-};
-
-class RpiSettingsWidget : public sdlgui::Button, public Interface
-{
-	public:
-		RpiSettingsWidget(sdlgui::Widget *parent, std::vector<std::string> options, NanoSdlWindow* gui_object, std::string setting_name);
-		~RpiSettingsWidget();
-		
-		void Highlight();
-		void Reset();
-		void OnClick();
-		void OnChoiceClick(RpiSettingsWidget* choice);
-		void SetNeighbours(Interface *N, Interface *S, Interface *W, Interface *E);
-		
-		NanoSdlWindow *gui_object;
-		sdlgui::Popup *pop = nullptr;
-		std::string setting_name;
-	
-	private:
-		sdlgui::Theme *focused_theme;
-		std::vector<std::string> allOptions;
-};
-
-
-class NanoSdlWindow : public sdlgui::Screen
+class NanoSdlWindow
 {
 	public:
 		NanoSdlWindow(SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* sdl_renderer);
@@ -197,11 +101,10 @@ class NanoSdlWindow : public sdlgui::Screen
 		
 		bool start();
 		int hostClick();
-		void registClick();
-		bool keyboardEvent(int key, int scancode, int action, int modifiers);
-		virtual void draw(SDL_Renderer* renderer);
-		virtual void drawContents();
-		void moveFocus(int direction);  /// 1=North, 2=South, 3=West, 4=East
+		void registClick(std::string acc_id, std::string pin);
+		//bool keyboardEvent(int key, int scancode, int action, int modifiers);
+		//virtual void draw(SDL_Renderer* renderer);
+		//virtual void drawContents();
 		virtual bool resizeEvent(int w, int h);
 		void mouseClickEvent();
 		void PressSelect();
@@ -209,50 +112,43 @@ class NanoSdlWindow : public sdlgui::Screen
 		void restoreGui();
 		void RefreshScreenDraw();
 		
+		/// Imgui things
+		SDL_GLContext gl_context;
+		void SettingsDraw(const char* label, std::vector<std::string> list, std::string &select);
+		
+		std::vector<std::string> decoder_options;
+		std::string sel_decoder;
+		std::vector<std::string> vcodec_options;
+		std::string sel_vcodec;
+		std::vector<std::string> resolution_options;
+		std::string sel_resolution;
+		std::vector<std::string> framerate_options;
+		std::string sel_framerate;
+		std::vector<std::string> audio_options;
+		std::string sel_audio;
+		
+		void UpdateSettingsGui();
+		void ChangeSettingAction(std::string choice);
+		
+		void HandleSDLEvents();
+		ImVec4 clear_color;
+		bool open_regist = false;
+		std::string regist_acc_id;
+		std::string regist_pin;
+		
+		
 		SDL_Window *sdl_window; 
 		SDL_Renderer* sdl_renderer;
 		bool takeInput=1;
 		RpiSettings *settings = nullptr;
-		//sdlgui::Widget *currentWidget = nullptr;
-		sdlgui::Window *settings_win;
-		Interface* current_widget;  // make this regular type, not struct
-		
-		Theme *window_theme;
-		Theme *settings_theme;
-		GridLayout *vert_group;
-		RpiSettingsWidget *db1;
-		RpiSettingsWidget *db2;
-		RpiSettingsWidget *db3;
-		RpiSettingsWidget *db4;
-		RpiSettingsWidget *db5;
+
 		
 
 	private:
 		ChiakiLog log;
-		
-		/// Widgets
-		sdlgui::Window *top_win;
-		sdlgui::BoxLayout *top_box_horizontal;
-		sdlgui::BoxLayout *box_vertical;
-		RpiHostIcon *host_icon;
-		std::vector<sdlgui::Button*>  hosts_widgets;
-		//std::vector<RpiSettingsWidget*>  settings_widgets;
-		
-		
-		/// Register
-		sdlgui::Button *regist_button;
-		Popup *regist_popup = nullptr;
-		TextBox *input_accId = nullptr;
-		TextBox *input_pin = nullptr;
-		
-
-		
-		sdlgui::Vector2i screenSize = sdlgui::Vector2i(1920, 1080);
 		int running=1;		/// main gui loop
 		int fullscreen=0;
 		std::string client_state = "unknown";	/// unknown, notreg, standby, waiting, ready, playing. For the button.
-		
-		void updateHostIcon(std::string client_state);
 };
 
 

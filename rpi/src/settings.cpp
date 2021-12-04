@@ -6,8 +6,8 @@ using namespace std;
 
 
 
-//char key_bytes_out[16] = {};
-// OLD NOT USED?
+/// char key_bytes_out[16] = {};
+// OLD NOT USED
 std::vector<char> KeyStr2ByteArray(std::string in_str) {
 
 	std::vector<char> key_bytes_out;
@@ -96,11 +96,11 @@ std::string GetValueForToken(std::string line, std::string token)
 
 RpiSettings::RpiSettings()
 {
-	sessionSettingsNames.push_back("decoder");
-	sessionSettingsNames.push_back("codec");
-	sessionSettingsNames.push_back("resolution");
-	sessionSettingsNames.push_back("fps");
-	sessionSettingsNames.push_back("audio");
+	//~ sessionSettingsNames.push_back("decoder");
+	//~ sessionSettingsNames.push_back("codec");
+	//~ sessionSettingsNames.push_back("resolution");
+	//~ sessionSettingsNames.push_back("fps");
+	//~ sessionSettingsNames.push_back("audio");
 }
 
 RpiSettings::~RpiSettings()
@@ -135,29 +135,33 @@ void RpiSettings::PrintHostSettings(rpi_settings_host host1)
 // Only works for Single Host ATM
 void RpiSettings::RefreshSettings(std::string setting, std::string choice)
 {
-	printf("Refreshing:  %s : %s\n", setting.c_str(), choice.c_str());
-	
-	if(setting == "decoder") {
-		all_host_settings.at(0).sess.decoder = choice;
-	}
-	
-	if(setting =="codec") {
-		all_host_settings.at(0).sess.codec = choice;
-	}
-	
-	if(setting =="resolution") {
-		all_host_settings.at(0).sess.resolution = choice;
-	}
-	
-	if(setting =="fps") {
-		all_host_settings.at(0).sess.fps = choice;
-	}
-	
-	if(setting =="audio") {
-		all_host_settings.at(0).sess.audio_device = choice;
-	}
 
-	WriteYaml(all_host_settings);
+	if(all_validated_settings.size())
+	{
+		printf("Refreshing:  %s : %s\n", setting.c_str(), choice.c_str());
+	
+		if(setting == "decoder") {
+			all_validated_settings.at(0).sess.decoder = choice;
+		}
+
+		if(setting =="codec") {
+			all_validated_settings.at(0).sess.codec = choice;
+		}
+
+		if(setting =="resolution") {
+			all_validated_settings.at(0).sess.resolution = choice;
+		}
+
+		if(setting =="fps") {
+			all_validated_settings.at(0).sess.fps = choice;
+		}
+
+		if(setting =="audio") {
+			all_validated_settings.at(0).sess.audio_device = choice;
+		}
+
+		WriteYaml(all_validated_settings);
+	}
 }
 
 	// values must not change
@@ -211,59 +215,6 @@ ChiakiVideoFPSPreset RpiSettings::GetChiakiFps(std::string choice)
 {	
 	if(choice == "30") return CHIAKI_VIDEO_FPS_PRESET_30;
 	else return CHIAKI_VIDEO_FPS_PRESET_60;
-}
-
-
-/// not using actual libyaml to write. Seemed too complicated.
-/// re-writing the full file at once from current settings in memory.
-void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
-{
-	std::string filename("/home/");
-	filename.append(getenv("USER"));
-	filename.append("/.config/Chiaki/Chiaki_rpi.conf");
-		
-	ofstream out(filename);
-	if (!out.is_open()) {
-		printf("Could not open config file for writing: %s\n", filename.c_str());
-		return;
-	}
-	
-	/// Yaml needs spaces as tabs
-	const char *tab1="  ";
-	const char *tab2="    ";
-	const char *tab3="      ";
-	
-	/// Current Settings Data
-	int version = SETTINGS_VERSION;
-	
-	
-	rpi_settings_host host1 = all_host_settings.at(0);
-	int hostN=1;
-	
-	/// Start Writing it all at once
-	out << "version: " << version << endl;
-	out << endl;
-
-	/// hosts
-	out << "regist_hosts:" << endl;
-		out << tab1; out << "- host: " 		<< hostN << endl;
-			out << tab2; out << "isPS5: " 	<< host1.isPS5 << endl;
-			out << tab2; out << "nick: "	<< host1.nick_name << endl;
-			out << tab2; out << "id: " 		<< host1.id << endl;
-			out << tab2; out << "rp_key: "  << host1.rp_key << endl;
-			out << tab2; out << "regist: "  << host1.regist << endl;
-			out << tab2; out << "session: " << endl;
-				out << tab3; out << "decoder: " 	<< host1.sess.decoder << endl;
-				out << tab3; out << "codec: " 		<< host1.sess.codec << endl;
-				out << tab3; out << "resolution: "  << host1.sess.resolution << endl;
-				out << tab3; out << "fps: " 		<< host1.sess.fps << endl;
-				out << tab3; out << "audio_device: "<< host1.sess.audio_device << endl;
-
-
-	/// Finish
-	out.flush();
-	out.close();
-	printf("Wrote yaml file\n");
 }
 
 /// Currently only supports one host in file
@@ -340,7 +291,7 @@ void RpiSettings::ReadYaml()
 	}
 	
 	if(n_hosts > 0) {
-		all_host_settings.push_back(bufHost);
+		all_read_settings.push_back(bufHost);
 		printf("Found settings for %d host(s)\n", n_hosts);
 	}
 	
@@ -350,6 +301,60 @@ void RpiSettings::ReadYaml()
 	
   return ;
 }
+
+/// not using actual libyaml to write. Seemed too complicated.
+/// re-writing the full file at once from current settings in memory.
+void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
+{
+	std::string filename("/home/");
+	filename.append(getenv("USER"));
+	filename.append("/.config/Chiaki/Chiaki_rpi.conf");
+		
+	ofstream out(filename);
+	if (!out.is_open()) {
+		printf("Could not open config file for writing: %s\n", filename.c_str());
+		return;
+	}
+	
+	/// Yaml needs spaces as tabs
+	const char *tab1="  ";
+	const char *tab2="    ";
+	const char *tab3="      ";
+	
+	/// Current Settings Data
+	int version = SETTINGS_VERSION;
+	
+	
+	rpi_settings_host host1 = all_host_settings.at(0);
+	int hostN=1;
+	
+	/// Start Writing it all at once
+	out << "version: " << version << endl;
+	out << endl;
+
+	/// hosts
+	out << "regist_hosts:" << endl;
+		out << tab1; out << "- host: " 		<< hostN << endl;
+			out << tab2; out << "isPS5: " 	<< host1.isPS5 << endl;
+			out << tab2; out << "nick: "	<< host1.nick_name << endl;
+			out << tab2; out << "id: " 		<< host1.id << endl;
+			out << tab2; out << "rp_key: "  << host1.rp_key << endl;
+			out << tab2; out << "regist: "  << host1.regist << endl;
+			out << tab2; out << "session: " << endl;
+				out << tab3; out << "decoder: " 	<< host1.sess.decoder << endl;
+				out << tab3; out << "codec: " 		<< host1.sess.codec << endl;
+				out << tab3; out << "resolution: "  << host1.sess.resolution << endl;
+				out << tab3; out << "fps: " 		<< host1.sess.fps << endl;
+				out << tab3; out << "audio_device: "<< host1.sess.audio_device << endl;
+
+
+	/// Finish
+	out.flush();
+	out.close();
+	printf("Wrote yaml file\n");
+}
+
+
 
 
 size_t RpiSettings::GetB64encodeSize(size_t in)

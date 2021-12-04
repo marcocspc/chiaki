@@ -1,8 +1,13 @@
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -W -Wall -Wextra -g") #-pg added for gprof, sends breaking signals.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W -Wall -Wextra -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W -Wall -Wextra -g -DIMGUI_IMPL_OPENGL_ES2")
 
-#message("${CMAKE_SOURCE_DIR}")
+#CXXFLAGS += -DIMGUI_IMPL_OPENGL_ES2
+#LINUX_GL_LIBS = -lGLESv2
+
+message("${CMAKE_SOURCE_DIR}")
+
+#/home/pi/dev/chiaki_v4l2/third-party
 
 #find_package(SDL2 MODULE REQUIRED)
 find_package(SDL2 2.0.17 REQUIRED)
@@ -20,12 +25,24 @@ include_directories(
 	"${FFMPEG_INCLUDE_DIRS}" 			# needed for correct AV_PIX_FMT_DRM_PRIME==181
 	"${CMAKE_SOURCE_DIR}/rpi/include/"
 	"${CMAKE_SOURCE_DIR}/lib/include/"
+     "${CMAKE_SOURCE_DIR}/third-party/imgui/"
+     "${CMAKE_SOURCE_DIR}/third-party/imgui/backends/"
 	"${SDL2_INCLUDE_DIRS}"
 	/usr/include/libdrm
      /usr/include
 	/home/pi/dev/nanogui-sdl/
 	/home/pi/dev/nanogui-sdl/sdlgui)
-	
+     
+     
+# Imgui source files
+list(APPEND IMGUI_SOURCE_FILES
+     ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui.cpp
+     ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_draw.cpp
+     ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_tables.cpp
+     ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_widgets.cpp
+     ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_sdl.cpp
+     ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_opengl3.cpp)
+     
 	
 # Nano Gui source files
 list(APPEND NNGUI_BASIC_SOURCE
@@ -100,7 +117,8 @@ add_executable(chiaki-rpi
 				src/main.cpp
 				src/settings.cpp
                     src/gui.cpp
-				${NNGUI_BASIC_SOURCE})
+				${NNGUI_BASIC_SOURCE}
+                    ${IMGUI_SOURCE_FILES})
 
 # ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY} already in chiaki-lib
 # 

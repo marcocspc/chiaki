@@ -40,9 +40,9 @@ struct rpi_settings_session {
 };
 
 struct rpi_settings_host{
-	std::string isPS5;
+	std::string isPS5; /// 0,1
 	std::string nick_name;
-	std::string id; //mac or id?
+	std::string id; ///mac
 	std::string rp_key;
 	std::string regist;
 	rpi_settings_session sess;
@@ -62,8 +62,10 @@ class RpiSettings
 		ChiakiVideoResolutionPreset GetChiakiResolution(std::string choice);
 		ChiakiVideoFPSPreset GetChiakiFps(std::string choice);
 		
-		std::vector<std::string> sessionSettingsNames;
-		std::vector<rpi_settings_host> all_host_settings;
+		//std::vector<std::string> sessionSettingsNames;
+		std::vector<rpi_settings_host> all_host_settings; 		// old validated settings
+		std::vector<rpi_settings_host> all_read_settings; 		// NEW read settings
+		std::vector<rpi_settings_host> all_validated_settings; 	// NEW validated settings
 	
 	private:
 	

@@ -17,18 +17,17 @@
 
 // TO-DOs:
 // Gui for registration.
-// Figure out Settings store/load. Yaml?
 // PS5.  Publish!?
 // multiple hosts. drm stream render aspect ratio.
-// 
+// DRM render on Desktop
+
 // See serveritemwidget.cpp for ident Unregistered
 
+///#include "gperftools/profiler.h"
 /// export CPUPROFILE_FREQUENCY=50
 /// env CPUPROFILE=out.prof rpi/chiaki-rpi
 /// > google-pprof --text rpi/chiaki-rpi out.prof
 
-
-///#include "gperftools/profiler.h"
 
 int main()
 {
@@ -42,9 +41,11 @@ int main()
 	///
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 	SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	
 	SDL_Init(SDL_INIT_VIDEO);
 	//SDL_VideoInit(NULL);
@@ -79,20 +80,21 @@ int main()
 		SDL_Quit();
 		return 1;
 	}
+	SDL_GL_SetSwapInterval(1); /// Enable vsync
+	
 	SDL_RendererInfo info;
 	SDL_GetRendererInfo( sdl_renderer, &info );
 	printf("SDL_RENDER_DRIVER selected: %s\n", info.name);
 	SDL_SetRenderDrawBlendMode(sdl_renderer, SDL_BLENDMODE_BLEND);
 	
-	//ProfilerStart();
+
 	/// GUI start
 	NanoSdlWindow *screen = new NanoSdlWindow(sdl_window, WinWidth, WinHeight, sdl_renderer);
 	screen->start();
 	//while(1)SDL_Delay(1000);
 	
+	
 	/// Finish
-	//ProfilerStop();
-
 	printf("END rpidrm\n");
 	return 0;
 }
