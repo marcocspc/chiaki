@@ -172,7 +172,7 @@ void RpiSettings::RefreshSettings(std::string setting, std::string choice)
 ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice)
 {	
 	bool isPS5 = false;
-	if(all_host_settings.at(0).isPS5 == "1") isPS5 = true;
+	if(all_validated_settings.at(0).isPS5 == "1") isPS5 = true;
 		
 	if(choice == "automatic" && isPS5)
 		return CHIAKI_CODEC_H265;
@@ -196,7 +196,7 @@ ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice)
 ChiakiVideoResolutionPreset RpiSettings::GetChiakiResolution(std::string choice)
 {
 	bool isPS5 = false;
-	if(all_host_settings.at(0).isPS5 == "1") isPS5 = true;
+	if(all_validated_settings.at(0).isPS5 == "1") isPS5 = true;
 	
 	if(choice == "540") return CHIAKI_VIDEO_RESOLUTION_PRESET_540p;
 	

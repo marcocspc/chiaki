@@ -4,10 +4,15 @@
 #include <assert.h>
 #include <unistd.h>		/// sleep()
 
+///#include <X11/Xlib.h>   /// also need to link :(
+
 #include "rpi/gui.h"
 #include "rpi/host.h"
 #include "rpi/io.h"
 #include "rpi/settings.h"
+
+//#include <rpi/glhelp.h>
+#include <drm_fourcc.h>
 
 #define WinWidth 1920
 #define WinHeight 1080
@@ -16,6 +21,156 @@ typedef int32_t i32;
 typedef uint32_t u32;
 typedef int32_t b32;
 
+
+//~ inline void MessageCallback( GLenum source,
+                 //~ GLenum type,
+                 //~ GLuint id,
+                 //~ GLenum severity,
+                 //~ GLsizei length,
+                 //~ const GLchar* message,
+                 //~ const void* userParam )
+//~ {
+  //~ fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+           //~ ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
+            //~ type, severity, message );
+//~ }
+
+/// EGL error check
+void checkEgl() {
+	int err;        
+	if((err = eglGetError()) != EGL_SUCCESS){
+		printf("Error after peglCreateImageKHR!, error = %x\n", err);
+	} else {
+		printf("eglCreateImageKHR Success! \n");
+	}
+}
+
+/// GL Error Check
+void checkGl(){
+	GLenum err;
+	while ( ( err = glGetError() ) != GL_NO_ERROR) {
+		std::cerr << err;        
+	}
+}
+
+/// Use GL_LUMINANCE for type
+static const unsigned char texture_data[] =
+{
+	0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
+	0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF,
+	0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
+	0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF,
+	0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
+	0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF,
+	0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
+	0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF
+};
+
+/// negative x,y is bottom left and first vertex
+static const GLfloat vertices[][4][3] =
+{
+    { {-1.0, -1.0, 0.0}, { 1.0, -1.0, 0.0}, {-1.0, 1.0, 0.0}, {1.0, 1.0, 0.0} }
+};
+static const GLfloat uv_coords[][4][2] =
+{
+    { {0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}, {1.0, 1.0} }
+};
+
+// OpenGL shader setup
+#define DECLARE_YUV2RGB_MATRIX_GLSL \
+	"const mat4 yuv2rgb = mat4(\n" \
+	"    vec4(  1.1644,  1.1644,  1.1644,  0.0000 ),\n" \
+	"    vec4(  0.0000, -0.2132,  2.1124,  0.0000 ),\n" \
+	"    vec4(  1.7927, -0.5329,  0.0000,  0.0000 ),\n" \
+	"    vec4( -0.9729,  0.3015, -1.1334,  1.0000 ));"
+
+static const GLchar* vertex_shader_source =
+	"#version 300 es\n"
+	"in vec3 position;\n"
+	"in vec2 tx_coords;\n"
+	"out vec2 v_texCoord;\n"
+	"void main() {  \n"
+	"	gl_Position = vec4(position, 1.0);\n"
+	"	v_texCoord = tx_coords;\n"
+	"}\n";
+	
+static const GLchar* fragment_shader_source =
+	"#version 300 es\n"
+	"#extension GL_OES_EGL_image_external : require\n"
+	"precision mediump float;\n"
+	"//uniform samplerExternalOES texture;\n"
+	"uniform sampler2D texture;\n"
+	"in vec2 v_texCoord;\n"
+	"out vec4 out_color;\n"
+	"void main() {	\n"
+	"	//out_color = texture2D( texture, v_texCoord ) + vec4(v_texCoord.x*0.25,v_texCoord.y*0.25, 0, 1);\n"
+	"	out_color = texture2D( texture, v_texCoord ) + vec4(v_texCoord.x*0.25,v_texCoord.y*0.25, 0, 1);\n"
+	"	//out_color = vec4(1,1,0,1);\n"
+	"	//out_color = vec4(v_texCoord.x,v_texCoord.y,0,1);\n"
+	"}\n";
+	
+GLint common_get_shader_program(const char *vertex_shader_source, const char *fragment_shader_source) {
+	enum Consts {INFOLOG_LEN = 512};
+	GLchar infoLog[INFOLOG_LEN];
+	GLint fragment_shader;
+	GLint shader_program;
+	GLint success;
+	GLint vertex_shader;
+
+	/* Vertex shader */
+	vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
+	glCompileShader(vertex_shader);
+	glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(vertex_shader, INFOLOG_LEN, NULL, infoLog);
+		printf("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n%s\n", infoLog);
+	}
+
+	/* Fragment shader */
+	fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
+	glCompileShader(fragment_shader);
+	glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(fragment_shader, INFOLOG_LEN, NULL, infoLog);
+		printf("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog);
+	}
+
+	/* Link shaders */
+	shader_program = glCreateProgram();
+	glAttachShader(shader_program, vertex_shader);
+	glAttachShader(shader_program, fragment_shader);
+	glLinkProgram(shader_program);
+	glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(shader_program, INFOLOG_LEN, NULL, infoLog);
+		printf("ERROR::SHADER::PROGRAM::LINKING_FAILED\n%s\n", infoLog);
+	}
+
+	glDeleteShader(vertex_shader);
+	glDeleteShader(fragment_shader);
+	return shader_program;
+}
+
+static EGLint texgen_attrs[] = {
+   EGL_DMA_BUF_PLANE0_FD_EXT,
+   EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+   EGL_DMA_BUF_PLANE0_PITCH_EXT,
+   EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
+   EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT,
+   EGL_DMA_BUF_PLANE1_FD_EXT,
+   EGL_DMA_BUF_PLANE1_OFFSET_EXT,
+   EGL_DMA_BUF_PLANE1_PITCH_EXT,
+   EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT,
+   EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT,
+   EGL_DMA_BUF_PLANE2_FD_EXT,
+   EGL_DMA_BUF_PLANE2_OFFSET_EXT,
+   EGL_DMA_BUF_PLANE2_PITCH_EXT,
+   EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT,
+   EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT,
+};
+
 NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* renderer)
 {
 	/// SDL2 Setup
@@ -23,7 +178,14 @@ NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_
 	sdl_renderer = renderer;
 	u32 WindowFlags = SDL_WINDOW_OPENGL; /// added  | SDL_WINDOW_FULLSCREEN
 	
+	if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0)///0 is match
+		IsX11 = true;
+	else IsX11 = false;
+	printf("Running under X11: %d\n", IsX11);
 	
+	//~ if(XOpenDisplay(NULL))
+		//~ printf("Running under X11\n");
+		
 	/// not sure where the best place for this is?
 	host = new Host;
 	io = new IO;
@@ -38,9 +200,11 @@ NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_
 	
 	ret = host->StartDiscoveryService();
 	
-	
-	/// Imgui
+	//  T E M P
+	return;
 
+
+	/// Imgui
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	/// Setup Dear ImGui style
@@ -48,7 +212,7 @@ NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_
 	
 	
 	/// settings options - THESE ARE THE ACTUAL SETTINGS SO DON'T CHANGE THE STRINGS.
-	decoder_options = {"v4l2-drm"};/// "v4l2-gl", "mmal"
+	decoder_options = {"automatic", "v4l2-drm"};///"v4l2-drm", "v4l2-gl", "mmal"
 	sel_decoder = decoder_options[0];
 	
 	vcodec_options =  {"automatic" ,"h264", "h265"};
@@ -87,7 +251,7 @@ void NanoSdlWindow::SettingsDraw(const char* label, std::vector<std::string> lis
 	ImGui::Text(label); ImGui::SameLine(120);
 	ImVec2 button_sz(200, 30);
 	
-	// try popup modal instead to setting its size?
+	// try popup modal instead for bigger popup?
 	if(ImGui::Button(select.c_str(), button_sz)){
 		ImGui::OpenPopup(label);
 	}
@@ -164,10 +328,37 @@ refresh:
 ///
 bool NanoSdlWindow::start()
 {	
+	sleep(2);
+	io->InitFFmpeg();
+	sleep(3);
+	InitVideoGl();
+	sleep(1);	/// some time is needed here, was 1 
+	host->StartSession();
+	io->SwitchInputReceiver(std::string("session"));
+	setClientState("playing");
+	printf("Starting test run\n");
+	while(1)
+	{	
+		// Probably something to do with running between different threads?
+		
+		//HandleSDLEvents();
+		usleep(30000);
+		//glViewport(0, 0, 1280, 720); // should set in Resize() callback
+		glBindTexture(GL_TEXTURE_EXTERNAL_OES, new_texture);
+		//glBindTexture(GL_TEXTURE_2D, texture);
+		//glGetUniformLocation(program, "texture");
+		//glUseProgram(program);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+		SDL_GL_SwapWindow(sdl_window);
+	}
+	return false;
+	
+	
 	/// start gui'ing
 	bool show_demo_window = true;
 	bool show_another_window = false;
-	clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	clear_color = ImVec4(0.45f, 0.55f, 0.60f, 0.1f);
 
 	ImGuiStyle &style = ImGui::GetStyle();
 	style.WindowRounding = 8.0f;///8
@@ -221,8 +412,7 @@ bool NanoSdlWindow::start()
 			static ImGuiTreeNodeFlags base_flags = ImGuiTreeNodeFlags_None | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 			
 			ImGuiWindowFlags child_flags = 0;
-			
-			
+						
 			// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
 			{
 				static float f = 0.0f;
@@ -230,7 +420,7 @@ bool NanoSdlWindow::start()
 			
 				ImGui::SetNextWindowSize(ImVec2(1400, 300), ImGuiCond_Once);
 				//printf("WinX:  %d\n", ImGui::GetContentRegionAvail().x);
-
+				
 				//ImGui::Begin("~~~ Playstation Hosts ~~~", p_open, window_flags);              // Create a window called "Hello, world!" and append into it.
 				//ImGui::BeginChild("ChildL", ImVec2(ImGui::GetContentRegionAvail().x * 0.9f,ImGui::GetContentRegionAvail().y * 0.5), false, ImGuiWindowFlags_NavFlattened);
 				ImGui::BeginChild("ChildA", ImVec2(1000,300), false, ImGuiWindowFlags_NavFlattened);
@@ -322,8 +512,7 @@ bool NanoSdlWindow::start()
 
 	/// Rendering
 	RefreshScreenDraw();
-		
-		
+
 	} // END while(!done)
 	
 
@@ -439,6 +628,383 @@ void NanoSdlWindow::HandleSDLEvents()
 	
 }
 
+// Now using glDmaTexture
+int NanoSdlWindow::InitVideoGl()
+{
+	GLuint vbo;
+	GLint pos;
+	GLint uvs;
+	
+	// Use v-sync=(1)
+	SDL_GL_SetSwapInterval(0);
+	///SDL_HINT_RENDER_VSYNC 0
+	// Disable depth test and face culling.
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	printf("GL_VERSION  : %s\n", glGetString(GL_VERSION) );
+	printf("GL_RENDERER : %s\n", glGetString(GL_RENDERER) );
+	
+	/// Shader
+	program = common_get_shader_program(vertex_shader_source, fragment_shader_source);
+	pos = glGetAttribLocation(program, "position");
+	uvs = glGetAttribLocation(program, "tx_coords");
+	
+	/// Geometry
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices)+sizeof(uv_coords), 0, GL_STATIC_DRAW);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+		glBufferSubData(GL_ARRAY_BUFFER, sizeof(vertices), sizeof(uv_coords), uv_coords);
+	glEnableVertexAttribArray(pos);
+	glEnableVertexAttribArray(uvs);
+	glVertexAttribPointer(pos, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+	glVertexAttribPointer(uvs, 2, GL_FLOAT, GL_FALSE, 0,  (void*)sizeof(vertices) ); /// last is offset to loc in buf memory
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	
+	/// Texture init
+	    
+    /// Test with static data texture (from above) works. (edit shader too)
+    //~ glBindTexture(GL_TEXTURE_2D, texture);
+	//~ glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);//or GL_LINEAR
+    //~ glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    //~ glTexSubImage2D(GL_TEXTURE_2D,
+                    //~ 0,
+                    //~ 0, 0,
+                    //~ 8, 8,
+                    //~ GL_LUMINANCE, GL_UNSIGNED_BYTE,
+                    //~ texture_data);
+	//~ glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 8, 8, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, texture_data);
+    /// End Test texture
+    
+	//~ glGenTextures(1, &texture);
+	//~ glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+	//~ //checkGl();  //ok
+	//~ glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //~ glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//~ //checkGl(); //ok
+	//~ glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1280, 720, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	//~ //checkGl();//err code 1280
+	
+	glHint(GL_GENERATE_MIPMAP_HINT, GL_FASTEST);
+	glUseProgram(program);
+	//glGetUniformLocation(program, "texture");
+	
+	// below gets err code 1280
+	//glTexSubImage2D(GL_TEXTURE_EXTERNAL_OES, 0, 0,0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);///nullptr should work
+
+	// Gl err code GL_INVALID_ENUM	1280	Set when an enumeration parameter is not legal 
+	
+	//glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+	//glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
+	//glTexSubImage2D(GL_TEXTURE_EXTERNAL_OES, 0, 0,0,1,1,GL_RGBA, GL_UNSIGNED_BYTE, nullptr); // last = uv_default ?? or nullptr
+	//glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1, 1, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, nullptr);
+	//glGetUniformLocation(program, "texture");
+	//glUseProgram(program);
+	//glGetUniformLocation(program, "texture");
+	
+	
+	
+	/// Texture Init from 'tearing'
+	//~ GLuint targetTexture;
+	//~ glGenTextures(1, &targetTexture);
+	//~ glBindTexture(GL_TEXTURE_2D, targetTexture);
+	//~ glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, mode->width, mode->height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+
+	
+
+	
+	return 1;
+}
+
+
+
+bool NanoSdlWindow::UpdateFromGUI(AVFrame *frame)
+{	
+	
+	// perf test
+	//return true; // Still 17-18% CPU!
+	
+	
+	//printf("\nBEGIN AVOpenGLFrame::Update\n");
+	//auto f = QOpenGLContext::currentContext()->extraFunctions();
+	//printf("PIX Format in Update():  %d\n", frame->format); // 181 is the one!
+	//printf("DRM_PRIME as int in Update(): %d\n", AV_PIX_FMT_DRM_PRIME); //prints 182
+	
+	if(frame->format != AV_PIX_FMT_DRM_PRIME)
+	{	
+		printf("Inside Check.  Ie not a AV_PIX_FMT_DRM_PRIME Frame\n");
+		return false;
+	}
+	
+	//needed for aspect ratio fitting
+	int width = frame->width;
+	int height = frame->height;
+
+	
+	
+	/// My one
+	const AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
+	int fd = -1;
+	fd = desc->objects[0].fd;
+	//printf("FD: %d\n", fd);
+	//ORIG GLuint texture = 1;
+
+	EGLint attribs[50];
+	EGLint *a = attribs;
+	const EGLint *b = texgen_attrs;
+	
+	*a++ = EGL_WIDTH;
+	*a++ = av_frame_cropped_width(frame);
+	*a++ = EGL_HEIGHT;
+	*a++ = av_frame_cropped_height(frame);
+	*a++ = EGL_LINUX_DRM_FOURCC_EXT;
+	*a++ = desc->layers[0].format;
+
+	int i, j;
+	for (i = 0; i < desc->nb_layers; ++i) {
+            for (j = 0; j < desc->layers[i].nb_planes; ++j) {
+                const AVDRMPlaneDescriptor * const p = desc->layers[i].planes + j;
+                const AVDRMObjectDescriptor * const obj = desc->objects + p->object_index;
+                *a++ = *b++;
+                *a++ = obj->fd;
+                *a++ = *b++;
+                *a++ = p->offset;
+                *a++ = *b++;
+                *a++ = p->pitch;
+                if (obj->format_modifier == 0) {
+                   b += 2;
+                }
+                else {
+                   *a++ = *b++;
+                   *a++ = (EGLint)(obj->format_modifier & 0xFFFFFFFF);
+                   *a++ = *b++;
+                   *a++ = (EGLint)(obj->format_modifier >> 32);
+                }
+            }
+     }
+	
+	 *a = EGL_NONE;
+	
+	
+	SDL_SysWMinfo WMinfo;
+	SDL_VERSION(&WMinfo.version);
+	SDL_GetWindowWMInfo(sdl_window, &WMinfo);
+	EGLNativeDisplayType hwnd = WMinfo.info.x11.display;  /// WMinfo.info.kmsdrm.drm_fd, WMinfo.info.x11.display
+	EGLDisplay egl_display = eglGetDisplay(hwnd);
+	
+	///SDL_GL_GetCurrentContext   ORIG!
+	//EGLDisplay egl_display = eglGetCurrentDisplay();
+	
+///printf("EGLDisplay:  %d\n", egl_display);///6062456, 28434872, 8860088
+	const EGLImage image = eglCreateImageKHR( egl_display,
+                                              EGL_NO_CONTEXT,
+                                              EGL_LINUX_DMA_BUF_EXT,
+                                              NULL, attribs);
+	if (!image) {
+		printf("Failed to create EGLImage\n");
+		return -1;
+	}
+
+	/// his
+	glGenTextures(1, &texture);
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, nullptr);
+
+	new_texture = texture;
+
+	eglDestroyImageKHR(&egl_display, image);
+	
+	//printf("END AVOpenGLFrame::Update\n\n");
+	return true;
+}
+
+
+
+bool NanoSdlWindow::UpdateAVFrame(AVFrame *frame)
+{	
+	
+	// TEMP TEST
+	UpdateFromGUI(frame);
+	return true;
+	
+	
+	
+	if(frame->format != AV_PIX_FMT_DRM_PRIME)
+	{	
+		printf("UpdateAVFrame: Not a AV_PIX_FMT_DRM_PRIME Frame, %d\n", frame->format);
+		return false;
+	}
+	
+	//needed for aspect ratio fitting
+	int width = frame->width;
+	int height = frame->height;
+
+	
+	
+	/// My one
+	const AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
+	int fd = -1;
+	fd = desc->objects[0].fd;
+	//printf("FD: %d\n", fd);
+	//GLuint texture = 1;
+	texture = 1;
+	
+	int TEST_fd=-1;
+
+	EGLint attribs[50];
+	EGLint *a = attribs;
+	const EGLint *b = texgen_attrs;
+	
+	*a++ = EGL_WIDTH;
+	*a++ = av_frame_cropped_width(frame);
+	*a++ = EGL_HEIGHT;
+	*a++ = av_frame_cropped_height(frame);
+	*a++ = EGL_LINUX_DRM_FOURCC_EXT;
+	*a++ = desc->layers[0].format;
+
+	int i, j;
+	for (i = 0; i < desc->nb_layers; ++i) {
+            for (j = 0; j < desc->layers[i].nb_planes; ++j) {
+                const AVDRMPlaneDescriptor * const p = desc->layers[i].planes + j;
+                const AVDRMObjectDescriptor * const obj = desc->objects + p->object_index;
+                *a++ = *b++;
+                *a++ = obj->fd; TEST_fd = obj->fd;
+                *a++ = *b++;
+                *a++ = p->offset;
+                *a++ = *b++;
+                *a++ = p->pitch;
+                if (obj->format_modifier == 0) {
+                   b += 2;
+                }
+                else {
+                   *a++ = *b++;
+                   *a++ = (EGLint)(obj->format_modifier & 0xFFFFFFFF);
+                   *a++ = *b++;
+                   *a++ = (EGLint)(obj->format_modifier >> 32);
+                }
+            }
+     }
+	
+	 *a = EGL_NONE;
+	
+	SDL_SysWMinfo WMinfo;
+	SDL_VERSION(&WMinfo.version);
+	SDL_GetWindowWMInfo(sdl_window, &WMinfo);
+	EGLNativeDisplayType hwnd = WMinfo.info.x11.display;  /// WMinfo.info.kmsdrm.drm_fd, WMinfo.info.x11.display
+	EGLDisplay egl_display = eglGetDisplay(hwnd);
+	//printf("EGLDisplay A:  %d\n", egl_display);// should not be 0 or negative
+	
+	//EGLint *major=nullptr, *minor=nullptr;
+	//eglInitialize(egl_display, major, minor);
+	//segfaults printf("EGL Init: v%d.%d\n", *major, *minor);
+	
+	//EGLNativeDisplayType hhh = EGLNativeDisplayType(EGL_DEFAULT_DISPLAY);
+	//EGLDisplay _egl_display = eglGetDisplay(hhh);
+	
+	///SDL_GL_GetCurrentDisplay() but only SDL2 2.0.20
+	/// None of these seem to work. Error is NOT the egl_display !?!!
+	//EGLDisplay egl_display = eglGetCurrentDisplay();///old orig, no work in X11 or CLI. Fine in Chiaki-gui
+	//EGLDisplay egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);/// ok but eglCreateImageKHR no work in either
+	//printf("EGLDisplay B:  %d\n", _egl_display);// should not be 0 or negative	
+	if(egl_display == EGL_NO_DISPLAY){
+		printf("UpdateAVFrame:  No EGL Display found\n");
+		return -1;
+	}
+
+	//SDL_GLContext glcontext = SDL_GL_CreateContext(sdl_window);
+
+
+	/// Should test with the egl_vout code? No its using lots of custom code.
+	/// Need a test with SDL + eglCreateImageKHR
+	
+	const EGLImage image = eglCreateImageKHR( egl_display,
+                                              EGL_NO_CONTEXT,
+                                              EGL_LINUX_DMA_BUF_EXT,
+                                              NULL,
+                                              attribs);
+                         
+    ///
+    //~ const EGLint pbuf_attribs[] = {
+                    //~ EGL_WIDTH, 1280,
+                    //~ EGL_HEIGHT, 720,
+                    //~ EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_XRGB8888,  /// takes 16 or 32 bits per pixel (or 8 probably)
+					//~ EGL_DMA_BUF_PLANE0_FD_EXT, TEST_fd,
+					//~ EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
+					//~ EGL_DMA_BUF_PLANE0_PITCH_EXT, 1280*4,
+                    //~ EGL_NONE};
+   	//~ const EGLImage image = eglCreateImageKHR( egl_display,
+                                              //~ EGL_NO_CONTEXT,
+                                              //~ EGL_LINUX_DMA_BUF_EXT,
+                                              //~ NULL,
+                                              //~ pbuf_attribs);                 
+                    
+	/// Success reported here!
+
+	if (!image) {	///or EGL_NO_IMAGE_KHR
+		printf("Failed to create EGLImage\n");
+		return -1;
+	}
+	return 1;
+	glGenTextures(1, &texture);
+	glEnable(GL_TEXTURE_EXTERNAL_OES);
+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
+	checkGl();
+	new_texture = texture;
+	eglDestroyImageKHR(&egl_display, image);
+	return 1;
+
+	/// his
+	//~ glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
+	//~ uint8_t uv_default[] = {0x7f, 0x7f};
+	//~ glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1280, 720, 0, GL_RGBA, GL_UNSIGNED_BYTE, uv_default);
+	//~ glGetUniformLocation(program, "texture");
+	
+	//glEnable(GL_TEXTURE_EXTERNAL_OES);
+	//glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+	//glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	//glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
+	/// Success reported here!
+	
+	
+	
+	
+	//glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	new_texture = texture;
+	
+	glGetUniformLocation(program, "texture");
+	eglDestroyImageKHR(&egl_display, image);
+	
+
+	/*
+	glGenTextures(1, &texture);
+	glEnable(GL_TEXTURE_EXTERNAL_OES);
+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	
+	uint8_t uv_default[] = {0x7f, 0x7f};
+	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
+	//NOT glTexSubImage2D(GL_TEXTURE_EXTERNAL_OES, 0, 0,0,1,1,GL_RGBA, GL_UNSIGNED_BYTE, nullptr); // last = uv_default ?? or nullptr
+	//NOT glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1, 1, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, nullptr);
+	
+	glGetUniformLocation(program, "texture");
+	
+	// This one needed?
+	eglDestroyImageKHR(&egl_display, image);
+	*/
+	//printf("Ran through NanoSdlWindow::UpdateAVFrame\n");
+}
+
 
 void NanoSdlWindow::RefreshScreenDraw()
 {	
@@ -448,8 +1014,20 @@ void NanoSdlWindow::RefreshScreenDraw()
 	
 	ImGui::Render();
 	glViewport(0, 0, (int)imio.DisplaySize.x, (int)imio.DisplaySize.y);
+	
 	glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-	glClear(GL_COLOR_BUFFER_BIT);
+	//glClear(GL_COLOR_BUFFER_BIT);// remove when playing video!
+	
+	/// Draw video frame
+	//~ glBindTexture(GL_TEXTURE_EXTERNAL_OES, da->texture);
+    //~ glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    //~ eglSwapBuffers(de->setup.egl_dpy, de->setup.surf);
+	//glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+	glUseProgram(program);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	
+	//glDeleteTextures(1, &texture); // needed? slows down mebbe
+	
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 	SDL_GL_SwapWindow(sdl_window);	
 }
@@ -496,7 +1074,7 @@ int NanoSdlWindow::hostClick()
 	{
 		printf("Starting Play session!\n");
 		
-		SDL_MinimizeWindow(sdl_window);
+		//SDL_MinimizeWindow(sdl_window);
 
 		/// transfer drm_fd
 		SDL_SysWMinfo WMinfo;
@@ -504,8 +1082,10 @@ int NanoSdlWindow::hostClick()
 		SDL_GetWindowWMInfo(sdl_window, &WMinfo);
 		printf("SDL drm_fd:  %d\n", WMinfo.info.kmsdrm.drm_fd);
 		io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
-				
+		
+		
 		ret = io->InitFFmpeg();
+		InitVideoGl();
 		//sleep(1);	/// some time is needed here, was 1 
 		host->StartSession();
 		io->SwitchInputReceiver(std::string("session"));

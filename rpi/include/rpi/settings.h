@@ -63,9 +63,9 @@ class RpiSettings
 		ChiakiVideoFPSPreset GetChiakiFps(std::string choice);
 		
 		//std::vector<std::string> sessionSettingsNames;
-		std::vector<rpi_settings_host> all_host_settings; 		// old validated settings
+		//std::vector<rpi_settings_host> all_host_settings; 		// old validated settings
 		std::vector<rpi_settings_host> all_read_settings; 		// NEW read settings
-		std::vector<rpi_settings_host> all_validated_settings; 	// NEW validated settings
+		std::vector<rpi_settings_host> all_validated_settings; 	// NEW validated settings, session runs off these. 
 	
 	private:
 	

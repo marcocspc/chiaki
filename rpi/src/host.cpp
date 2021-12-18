@@ -58,8 +58,8 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 			new_host.rp_key = rp_key_str;
 			new_host.regist = regist_key;
 			
-			host->gui->settings->all_host_settings.push_back(new_host);
-			host->gui->settings->WriteYaml(host->gui->settings->all_host_settings);
+			host->gui->settings->all_validated_settings.push_back(new_host);
+			host->gui->settings->WriteYaml(host->gui->settings->all_validated_settings);
 			
 			// Not correct! Needs to be Discovered's state
 			host->gui->setClientState(std::string("ready"));
@@ -153,20 +153,7 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 					}
 				}///END id match
 			}
-			
-			/// OLD
-			//~ for(rpi_settings_host sh : host->gui->settings->all_host_settings) /// each host in settings file
-			//~ {
-				//~ if(sh.regist == "") { /// means discovered is not yet registered
-					//~ printf("Host needs to be registered!\n");
-					//~ host->gui->setClientState(std::string("notreg"));
-					//~ return;
-				//~ } else {/// it is registered already
-					//~ // Needs to get actual discovered's State 
-					//~ std::string state = chiaki_discovery_host_state_string(dh->state);
-					//~ host->gui->setClientState(state);
-				//~ }
-			//~ }
+
 		}
 
 	}
@@ -336,10 +323,10 @@ int Host::StartSession()
 	/// #define CHIAKI_SESSION_AUTH_SIZE 0x10  (16?)
 	// does it need to be full sized and end in /0 ie -> 677f884f\0\0\0\0\0\0\0\0
 	char out2[CHIAKI_SESSION_AUTH_SIZE] = {'0'};
-	int stringlen = gui->settings->all_host_settings.at(0).regist.length();
-	strncpy(out2, gui->settings->all_host_settings.at(0).regist.c_str(), stringlen);
+	int stringlen = gui->settings->all_validated_settings.at(0).regist.length();
+	strncpy(out2, gui->settings->all_validated_settings.at(0).regist.c_str(), stringlen);
 	
-	const char* regist = gui->settings->all_host_settings.at(0).regist.c_str();
+	const char* regist = gui->settings->all_validated_settings.at(0).regist.c_str();
 	//memcpy(&connect_info.regist_key, regist, sizeof(connect_info.regist_key));
 	memcpy(&connect_info.regist_key, out2, CHIAKI_SESSION_AUTH_SIZE);
 	printf("\nRegist:%sEND\n", connect_info.regist_key);
@@ -352,7 +339,7 @@ int Host::StartSession()
 	size_t rp_key_sz = sizeof(rp_key);
 	
 	chiaki_base64_decode(
-		gui->settings->all_host_settings.at(0).rp_key.c_str(), gui->settings->all_host_settings.at(0).rp_key.length(),
+		gui->settings->all_validated_settings.at(0).rp_key.c_str(), gui->settings->all_validated_settings.at(0).rp_key.length(),
 		rp_key, &rp_key_sz);
 	//NEW ORIGmemcpy(&connect_info.morning, rp_key, sizeof(connect_info.morning));
 	memcpy(&connect_info.morning, rp_key, rp_key_sz);
@@ -365,14 +352,13 @@ int Host::StartSession()
 	///printf("PS4 IP addr:  %s\n", connect_info.host);
 	
 	bool isPS5=false;
-	if(gui->settings->all_host_settings.at(0).isPS5 == "1") isPS5 = true;
+	if(gui->settings->all_validated_settings.at(0).isPS5 == "1") isPS5 = true;
 	
 	connect_info.ps5 = isPS5;
 	connect_info.video_profile_auto_downgrade = false;
 	connect_info.enable_keyboard = false;
 	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(gui->settings->all_validated_settings.at(0).sess.codec);
 	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(gui->settings->all_validated_settings.at(0).sess.resolution);
-	//ChiakiVideoResolutionPreset resolution_preset = CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
 	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(gui->settings->all_validated_settings.at(0).sess.fps);
 	chiaki_connect_video_profile_preset(&connect_info.video_profile, resolution_preset, fps_preset);
 	connect_info.video_profile.bitrate = 15000;

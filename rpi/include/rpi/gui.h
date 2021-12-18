@@ -2,8 +2,7 @@
 #define RPI_GUI_H
 
 #include <SDL2/SDL.h>
-#include <SDL.h>
-//#include <SDL2/SDL_opengl.h>
+///#include <SDL2/SDL_opengl.h>
 #include <SDL2/SDL_opengles2.h>
 
 #include "imgui.h"
@@ -19,11 +18,14 @@
 #include <string>
 #include <stdio.h>
 
+#include <libavcodec/avcodec.h> ///AVFrame
+
 #include <chiaki/log.h>
 #include "chiaki/regist.h"
 #include <chiaki/controller.h>
 
 #include "rpi/settings.h"
+#include "rpi/glhelp.h"
 
 using std::cout;
 using std::cerr;
@@ -63,6 +65,15 @@ struct SDL_SysWMinfo
 	SDL_SYSWM_TYPE subsystem;
 	union
 	{
+		
+//#if defined(SDL_VIDEO_DRIVER_X11)
+        struct
+        {
+            Display *display;           /**< The X11 display */
+            Window window;              /**< The X11 window */
+        } x11;
+//#endif
+		
 //#if defined(SDL_VIDEO_DRIVER_KMSDRM)
 		struct
 		{
@@ -86,6 +97,7 @@ extern DECLSPEC SDL_bool SDLCALL SDL_GetWindowWMInfo(SDL_Window * window,
 #ifdef __cplusplus
 }
 #endif
+
 ///-------------------------------------------------------------------------
 
 class Host;
@@ -112,6 +124,7 @@ class NanoSdlWindow
 		void restoreGui();
 		void RefreshScreenDraw();
 		
+	
 		/// Imgui things
 		SDL_GLContext gl_context;
 		void SettingsDraw(const char* label, std::vector<std::string> list, std::string &select);
@@ -139,9 +152,20 @@ class NanoSdlWindow
 		
 		SDL_Window *sdl_window; 
 		SDL_Renderer* sdl_renderer;
+		bool IsX11 = false;
 		bool takeInput=1;
 		RpiSettings *settings = nullptr;
-
+		
+		/// v4l2-gl/ffmpeg things
+		GLuint program;
+		GLuint texture;
+		GLuint new_texture;
+		bool hasTexInit=false;
+		
+		int InitVideoGl();
+		bool UpdateAVFrame(AVFrame *frame);
+		bool UpdateFromGUI(AVFrame *frame);  // TEST ONLY
+		
 		
 
 	private:

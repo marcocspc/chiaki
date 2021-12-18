@@ -44,7 +44,7 @@ class IO
 		std::mutex mtx;
 		AVCodec *codec =nullptr;
 		AVCodecContext *codec_context;
-		AVFrame *frame =nullptr;
+
 		drmprime_out_env_t *dpo = NULL;
 		
 		/// Audio
@@ -71,6 +71,7 @@ class IO
 		
 		int InitFFmpeg();
 		int FiniFFmpeg();
+		AVFrame *frame =nullptr;
 		int drm_fd;
 		bool takeInput=0;
 		void ShutdownStreamDrm();
@@ -79,6 +80,9 @@ class IO
 		void InitAudioCB(unsigned int channels, unsigned int rate);
 		bool VideoCB(uint8_t *buf, size_t buf_size);
 		void AudioCB(int16_t *buf, size_t samples_count);
+		
+		// TEST ONLY PLESAE REMOVE
+		int tmpCount=0;
 		
 
 };

@@ -1,11 +1,30 @@
 #include <rpi/io.h>
 
 
+
 /// Gamepad special input actions:
 ///
 /// R3+Circle to quit
 ///
 ///
+
+//~ static EGLint texgen_attrs[] = {
+   //~ EGL_DMA_BUF_PLANE0_FD_EXT,
+   //~ EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+   //~ EGL_DMA_BUF_PLANE0_PITCH_EXT,
+   //~ EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
+   //~ EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT,
+   //~ EGL_DMA_BUF_PLANE1_FD_EXT,
+   //~ EGL_DMA_BUF_PLANE1_OFFSET_EXT,
+   //~ EGL_DMA_BUF_PLANE1_PITCH_EXT,
+   //~ EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT,
+   //~ EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT,
+   //~ EGL_DMA_BUF_PLANE2_FD_EXT,
+   //~ EGL_DMA_BUF_PLANE2_OFFSET_EXT,
+   //~ EGL_DMA_BUF_PLANE2_PITCH_EXT,
+   //~ EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT,
+   //~ EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT,
+//~ };
 
 
 static enum AVPixelFormat get_hw_format(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts)
@@ -221,7 +240,9 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door
 	const char *hw_decoder_name = "drm";
 	enum AVHWDeviceType type;
 	AVCodec *av_codec;  //rename 'decoder' ?
-	const char *codec_name = "h264_v4l2m2m";  /// or "hevc"
+	//const char *codec_name = "h264_v4l2m2m";  /// or "hevc"
+	char *codec_name = "h264_v4l2m2m";
+	//codec_name = "hevc";
 		
 	type = av_hwdevice_find_type_by_name(hw_decoder_name);
 	if(type == AV_HWDEVICE_TYPE_NONE)
@@ -231,7 +252,7 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door
 		return 1;
 	}
 	
-	dpo = drmprime_out_new(drm_fd);  // I think I need to nicely close this after!?
+	//dpo = drmprime_out_new(drm_fd);  // I think I need to nicely close this after!?
     if (dpo == NULL) {
         fprintf(stderr, "Failed to open drmprime output\n");
         //return 1;
@@ -245,7 +266,7 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door
 		return 1;
 	}
 	
-	//hw_pix_fmt = AV_PIX_FMT_DRM_PRIME; /// new, but doesn't really matter
+	hw_pix_fmt = AV_PIX_FMT_DRM_PRIME; /// new, but doesn't really matter
 
 	codec_context = avcodec_alloc_context3(av_codec);
 	if(!codec_context)
@@ -307,8 +328,15 @@ int IO::FiniFFmpeg()
 }
 
 
+/// For kmsdrm render
 bool IO::VideoCB(uint8_t *buf, size_t buf_size)
-{
+{	
+	/// for frame dump only
+	size_t size;
+	AVFrame *sw_frame = nullptr;
+	uint8_t *buffer = NULL;
+	
+	
 	///printf("In VideoCB\n");
 	///printf("%d\n", buf_size);
 	
@@ -318,7 +346,6 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 	av_init_packet(&packet);
 	packet.data = buf;
 	packet.size = buf_size;
-	AVFrame *frame = NULL;//new
 	int ret = 0;
 		    
     if(&packet)
@@ -334,6 +361,7 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 	 
 	//this->mtx.unlock();
 	//this->mtx.lock();
+	
 
     while (1) {
         if (!(frame = av_frame_alloc())) {
@@ -346,7 +374,12 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 		///printf("PIX Format after receive_frame:  %d\n", frame->format);//181
 		if (ret == 0) {
 			//printf("Frame Successfully Decoded\n");
-			drmprime_out_display(dpo, frame);
+			
+			if(1)//host->gui->IsX11
+				host->gui->UpdateAVFrame(frame); /// openGl pipe
+			else
+				drmprime_out_display(dpo, frame); /// drm pipe
+
 			this->mtx.unlock();
 		}
 		if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
@@ -356,6 +389,61 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 		} else if (ret < 0) {
 			fprintf(stderr, "Error while decoding\n");
 		}
+
+	
+	
+	///https://github.com/jc-kynesim/hello_drmprime/blob/master/hello_drmprime.c  
+	///if(tmpCount == 150)
+	if(0)
+	{
+		sw_frame = av_frame_alloc();
+		const char* file_name = "dump_frame_yuv.raw";
+		FILE* output_file = fopen(file_name, "w");
+		AVFrame *tmp_frame;
+
+		if (frame->format == AV_PIX_FMT_DRM_PRIME) {
+			/* retrieve data from GPU to CPU */
+			if ((ret = av_hwframe_transfer_data(sw_frame, frame, 0)) < 0) {
+				fprintf(stderr, "Error transferring the data to system memory\n");
+				goto fail;
+			}
+			tmp_frame = sw_frame;
+		} else
+			tmp_frame = frame;
+
+		size = av_image_get_buffer_size((AVPixelFormat)tmp_frame->format, tmp_frame->width,
+										tmp_frame->height, 1);
+
+		buffer = static_cast<uint8_t *>(av_malloc(size));
+		if (!buffer) {
+			fprintf(stderr, "Can not alloc buffer\n");
+			ret = AVERROR(ENOMEM);
+			goto fail;
+		}
+		ret = av_image_copy_to_buffer(buffer, size,
+									  (const uint8_t * const *)tmp_frame->data,
+									  (const int *)tmp_frame->linesize, (AVPixelFormat)tmp_frame->format,
+									  tmp_frame->width, tmp_frame->height, 1);
+
+		if (ret < 0) {
+			fprintf(stderr, "Can not copy image to buffer\n");
+			goto fail;
+		}
+
+		if ((ret = fwrite(buffer, 1, size, output_file)) < 0) {
+			fprintf(stderr, "Failed to dump raw data.\n");
+			goto fail;
+		}
+
+		
+		fclose(output_file);
+		printf("FRAMEDUMP!\n");
+	}
+	tmpCount++;
+
+
+
+
 
    
 
