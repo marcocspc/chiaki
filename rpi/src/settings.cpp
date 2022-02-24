@@ -87,8 +87,11 @@ std::string GetValueForToken(std::string line, std::string token)
 	
 	if((found = line.find(token)) > -1)
 	{	
-		tmps = line.substr(line.find(":")+1, -1); /// all text after ":"
-		tmps.erase( remove_if( tmps.begin(), tmps.end(), ::isspace ), tmps.end() );  /// strip white space
+		tmps = line.substr(line.find(":")+1, -1); /// all text after ":" substr(pos,len), skipping first " "
+		/// need to strip first single whitespace after ":"
+		if(tmps.size() > 0)
+			tmps = tmps.substr(1, std::string::npos);
+		//tmps.erase( remove_if( tmps.begin(), tmps.end(), ::isspace ), tmps.end() );  /// strip white space
 	}
 	
 	return tmps;
@@ -117,22 +120,23 @@ void RpiSettings::PrintHostSettings(rpi_settings_host host1)
 	/// hosts
 	int hostN=1;
 	cout << "regist_hosts:" << endl;
-		cout << tab1; cout << "- host: " 		<< hostN << endl;
-			cout << tab2; cout << "isPS5: " 	<< host1.isPS5 << endl;
-			cout << tab2; cout << "nick: " 		<< host1.nick_name << endl;
-			cout << tab2; cout << "id: " 		<< host1.id << endl;
-			cout << tab2; cout << "rp_key: " 	<< host1.rp_key << endl;
-			cout << tab2; cout << "regist: " 	<< host1.regist << endl;
-			cout << tab2; cout << "session: " 	<< endl;
-				cout << tab3; cout << "decoder: " 	<< host1.sess.decoder << endl;
-				cout << tab3; cout << "codec: " 	<< host1.sess.codec << endl;
-				cout << tab3; cout << "resolution: "<< host1.sess.resolution << endl;
-				cout << tab3; cout << "fps: " 		<< host1.sess.fps << endl;
-				cout << tab3; cout << "audio: " 	<< host1.sess.audio_device << endl;
+		cout << tab1; cout << "- host : " 		<< hostN << endl;
+			cout << tab2; cout << "isPS5 : " 		<< host1.isPS5 << endl;
+			cout << tab2; cout << "nick : " 		<< host1.nick_name << endl;
+			cout << tab2; cout << "id : " 			<< host1.id << endl;
+			cout << tab2; cout << "rp_key : " 		<< host1.rp_key << endl;
+			cout << tab2; cout << "regist : " 		<< host1.regist << endl;
+			cout << tab2; cout << "session : " 		<< endl;
+				cout << tab3; cout << "decoder : " 		<< host1.sess.decoder << endl;
+				cout << tab3; cout << "codec : " 		<< host1.sess.codec << endl;
+				cout << tab3; cout << "resolution : "	<< host1.sess.resolution << endl;
+				cout << tab3; cout << "fps : " 			<< host1.sess.fps << endl;
+				cout << tab3; cout << "audio : " 		<< host1.sess.audio_device << endl;
 
 }
 
 // Only works for Single Host ATM
+//setting becomes "decoder" for "automatic" - something carries over
 void RpiSettings::RefreshSettings(std::string setting, std::string choice)
 {
 
@@ -168,7 +172,7 @@ void RpiSettings::RefreshSettings(std::string setting, std::string choice)
 	//~ CHIAKI_CODEC_H264 = 0,
 	//~ CHIAKI_CODEC_H265 = 1,
 	//~ CHIAKI_CODEC_H265_HDR = 2
-//~ } ChiakiCodec;
+	//~ } ChiakiCodec;
 ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice)
 {	
 	bool isPS5 = false;
@@ -287,7 +291,7 @@ void RpiSettings::ReadYaml()
 		if(ret != "") bufHost.sess.fps = ret;
 		
 		ret = GetValueForToken(s, "audio_device");
-		if(ret != "") bufHost.sess.audio_device = ret;
+		if(ret != "") {bufHost.sess.audio_device = ret;}
 	}
 	
 	if(n_hosts > 0) {
@@ -334,18 +338,18 @@ void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
 
 	/// hosts
 	out << "regist_hosts:" << endl;
-		out << tab1; out << "- host: " 		<< hostN << endl;
-			out << tab2; out << "isPS5: " 	<< host1.isPS5 << endl;
-			out << tab2; out << "nick: "	<< host1.nick_name << endl;
-			out << tab2; out << "id: " 		<< host1.id << endl;
-			out << tab2; out << "rp_key: "  << host1.rp_key << endl;
-			out << tab2; out << "regist: "  << host1.regist << endl;
-			out << tab2; out << "session: " << endl;
-				out << tab3; out << "decoder: " 	<< host1.sess.decoder << endl;
-				out << tab3; out << "codec: " 		<< host1.sess.codec << endl;
-				out << tab3; out << "resolution: "  << host1.sess.resolution << endl;
-				out << tab3; out << "fps: " 		<< host1.sess.fps << endl;
-				out << tab3; out << "audio_device: "<< host1.sess.audio_device << endl;
+		out << tab1; out << "- host : " 		<< hostN << endl;
+			out << tab2; out << "isPS5 : " 		<< host1.isPS5 << endl;
+			out << tab2; out << "nick : "		<< host1.nick_name << endl;
+			out << tab2; out << "id : " 		<< host1.id << endl;
+			out << tab2; out << "rp_key : "  	<< host1.rp_key << endl;
+			out << tab2; out << "regist : "  	<< host1.regist << endl;
+			out << tab2; out << "session : " 	<< endl;
+				out << tab3; out << "decoder : " 	<< host1.sess.decoder << endl;
+				out << tab3; out << "codec : " 		<< host1.sess.codec << endl;
+				out << tab3; out << "resolution : " << host1.sess.resolution << endl;
+				out << tab3; out << "fps : " 		<< host1.sess.fps << endl;
+				out << tab3; out << "audio_device : "<< host1.sess.audio_device << endl;
 
 
 	/// Finish

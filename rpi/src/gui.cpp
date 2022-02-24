@@ -3,46 +3,93 @@
 #include <stdint.h>
 #include <assert.h>
 #include <unistd.h>		/// sleep()
-
-///#include <X11/Xlib.h>   /// also need to link :(
+#include <algorithm>	/// min,max
 
 #include "rpi/gui.h"
 #include "rpi/host.h"
 #include "rpi/io.h"
 #include "rpi/settings.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "rpi/stb_image.h"	/// has to be here
 
-//#include <rpi/glhelp.h>
 #include <drm_fourcc.h>
 
 #define WinWidth 1920
 #define WinHeight 1080
 
-typedef int32_t i32;
-typedef uint32_t u32;
-typedef int32_t b32;
 
 
-//~ inline void MessageCallback( GLenum source,
-                 //~ GLenum type,
-                 //~ GLuint id,
-                 //~ GLenum severity,
-                 //~ GLsizei length,
-                 //~ const GLchar* message,
-                 //~ const void* userParam )
-//~ {
-  //~ fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
-           //~ ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
-            //~ type, severity, message );
-//~ }
+int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
+{	
+	int out=0;
+	out =  (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+	/// need to clamp as above over shoots
+	out = std::max(out, out_min);
+	out = std::min(out, out_max);
+	
+	return out;
+}
+
+/// The text blurbs for the info panel.
+const char* ChiakiGetHelpText(int n)
+{
+	const char* text = "\nWelcome to Chiaki!";
+	if(n==1)
+		text = "VIDEO DECODER:\n\nThe software that decodes the video stream. The actual decode happens on the Pi's hardware but this decides which API to use.\n\nCurrently only v4l2 is available and this is used through ffmpeg";
+	if(n==2)
+		text = "VIDEO CODEC:\n\nChoose which video compression format to request from your Playstation.\n\nh264 is older and a very common standard which works on PS4 upwards.\n\nh265 is a newer format that you can use with the PS5. It is more efficient when streaming high resolution video and also hopefully will support HDR video at some point in the future.\n\n\n\"Automatic\" will request h265 for PS5s.";
+	if(n==3)
+		text = "VIDEO RESOLUTION:\n\nYou can probably guess what this one does!\n\n1080p is only available for PS4-Pro and upwards.\n\nIf 1080 is selected and you have a PS4 it will automatically step down to 720p for the session.\n\nIf you have limited network bandwidth try a lower resolution.";
+	if(n==4)
+		text = "FRAME RATE:\n\nYou can request your playstation to send a 30 or 60 fps video stream.\n\nIf you have limited network bandwidth you can try the lower fps.";
+	if(n==5)
+		text = "AUDIO OUT:\n\nThis popup should list all the Audio Out devices that the program believes that your Raspberry currently has available.\n\nThe names might not look like you are used to but that's how the library I'm using for this sees them.";
+		
+	return text;
+}
+
+
+/// Simple helper function to load an image into a OpenGL texture with common settings
+bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height)
+{
+    /// Load from file
+    int image_width = 0;
+    int image_height = 0;
+    unsigned char* image_data = stbi_load(filename, &image_width, &image_height, NULL, 4);
+    if (image_data == NULL)
+        return false;
+
+    /// Create a OpenGL texture identifier
+    GLuint image_texture;
+    glGenTextures(1, &image_texture);
+    glBindTexture(GL_TEXTURE_2D, image_texture);
+
+    /// Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
+    /// Upload pixels into texture
+#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+#endif
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+    stbi_image_free(image_data);
+
+    *out_texture = image_texture;
+    *out_width = image_width;
+    *out_height = image_height;
+
+    return true;
+}
 
 /// EGL error check
 void checkEgl() {
 	int err;        
 	if((err = eglGetError()) != EGL_SUCCESS){
-		printf("Error after peglCreateImageKHR!, error = %x\n", err);
-	} else {
-		printf("eglCreateImageKHR Success! \n");
-	}
+		printf("EGL error! error = %x\n", err);
+	} 
 }
 
 /// GL Error Check
@@ -53,7 +100,7 @@ void checkGl(){
 	}
 }
 
-/// Use GL_LUMINANCE for type
+/// Test "texture", Use GL_LUMINANCE for type
 static const unsigned char texture_data[] =
 {
 	0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
@@ -73,7 +120,7 @@ static const GLfloat vertices[][4][3] =
 };
 static const GLfloat uv_coords[][4][2] =
 {
-    { {0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}, {1.0, 1.0} }
+    { {0.0, 1.0}, {1.0, 1.0}, {0.0, 0.0}, {1.0, 0.0} }
 };
 
 // OpenGL shader setup
@@ -85,27 +132,24 @@ static const GLfloat uv_coords[][4][2] =
 	"    vec4( -0.9729,  0.3015, -1.1334,  1.0000 ));"
 
 static const GLchar* vertex_shader_source =
-	"#version 300 es\n"
-	"in vec3 position;\n"
-	"in vec2 tx_coords;\n"
-	"out vec2 v_texCoord;\n"
+	"#version 100\n"
+	"attribute vec3 position;\n"
+	"attribute vec2 tx_coords;\n"
+	"varying vec2 v_texCoord;\n"
 	"void main() {  \n"
-	"	gl_Position = vec4(position, 1.0);\n"
-	"	v_texCoord = tx_coords;\n"
+	" gl_Position = vec4(position, 1.0);\n"
+	" v_texCoord = tx_coords;\n"
 	"}\n";
 	
 static const GLchar* fragment_shader_source =
-	"#version 300 es\n"
+	"#version 100\n"
 	"#extension GL_OES_EGL_image_external : require\n"
 	"precision mediump float;\n"
-	"//uniform samplerExternalOES texture;\n"
-	"uniform sampler2D texture;\n"
-	"in vec2 v_texCoord;\n"
-	"out vec4 out_color;\n"
+	"uniform samplerExternalOES texture;\n"
+	"//uniform sampler2D texture;\n"
+	"varying vec2 v_texCoord;\n"
 	"void main() {	\n"
-	"	//out_color = texture2D( texture, v_texCoord ) + vec4(v_texCoord.x*0.25,v_texCoord.y*0.25, 0, 1);\n"
-	"	out_color = texture2D( texture, v_texCoord ) + vec4(v_texCoord.x*0.25,v_texCoord.y*0.25, 0, 1);\n"
-	"	//out_color = vec4(1,1,0,1);\n"
+	"	gl_FragColor = texture2D( texture, v_texCoord );\n"
 	"	//out_color = vec4(v_texCoord.x,v_texCoord.y,0,1);\n"
 	"}\n";
 	
@@ -171,107 +215,169 @@ static EGLint texgen_attrs[] = {
    EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT,
 };
 
-NanoSdlWindow::NanoSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* renderer)
+ImguiSdlWindow::ImguiSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* renderer, SDL_GLContext* gl_context)
 {
-	/// SDL2 Setup
 	sdl_window = pwindow;
 	sdl_renderer = renderer;
-	u32 WindowFlags = SDL_WINDOW_OPENGL; /// added  | SDL_WINDOW_FULLSCREEN
+	gl_ctx = gl_context;
 	
 	if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0)///0 is match
-		IsX11 = true;
+		 IsX11 = true;
 	else IsX11 = false;
 	printf("Running under X11: %d\n", IsX11);
-	
-	//~ if(XOpenDisplay(NULL))
-		//~ printf("Running under X11\n");
-		
+			
 	/// not sure where the best place for this is?
 	host = new Host;
 	io = new IO;
-	host->gui = this;	/// connect up
-	int ret;
-	ret = io->Init(host);
-	ret = host->Init(io);
-	ret = io->InitGamepads();
+	host->gui = this;
+	io->Init(host);
+	host->Init(io);
+	io->InitGamepads();
+	
 
 	settings = new RpiSettings();
 	settings->ReadYaml();  /// before starting discovery service
 	
-	ret = host->StartDiscoveryService();
-	
-	//  T E M P
-	return;
-
+	host->StartDiscoveryService();
 
 	/// Imgui
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	/// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
 	
 	
-	/// settings options - THESE ARE THE ACTUAL SETTINGS SO DON'T CHANGE THE STRINGS.
-	decoder_options = {"automatic", "v4l2-drm"};///"v4l2-drm", "v4l2-gl", "mmal"
+	// settings options - THESE ARE THE ACTUAL SETTINGS SO DON'T CHANGE THE STRINGS.
+	decoder_options = {"automatic", "v4l2"};  /// "mmal" , doesn't like "-" symbols.
 	sel_decoder = decoder_options[0];
 	
-	vcodec_options =  {"automatic" ,"h264", "h265"};
+	vcodec_options =  {"automatic", "h264", "h265"};
 	sel_vcodec = vcodec_options[0];
 	
-	resolution_options = {"1080" ,"720", "540"};
+	resolution_options = {"1080", "720", "540"};
 	sel_resolution = resolution_options[0];
 	
-	framerate_options = {"60" ,"30"};
+	framerate_options = {"60", "30"};
 	sel_framerate = framerate_options[0];
 	
-	audio_options = {"hdmi" ,"jack"};
+	///audio_options = {"hdmi" ,"jack"};
+	///audio_options = {"default"};
+	// Audio logic is pretty rough, needs fixing up
+	for(std::string out_dev : io->audio_out_devices){
+		audio_options.push_back(out_dev);
+	}
 	sel_audio = audio_options[0];
-	
-	
-	
+
+
 	/// Setup Platform/Renderer backends
-	gl_context = SDL_GL_CreateContext(sdl_window);
-	ImGui_ImplSDL2_InitForOpenGL(sdl_window, gl_context);
-	const char* glsl_version = "#version 300 es"; //was: 100
+	ImGui_ImplSDL2_InitForOpenGL(sdl_window, *gl_ctx);
+	///const char* glsl_version = "#version 300 es"; //was: 100
+	const char* glsl_version = "#version 100";
 	ImGui_ImplOpenGL3_Init(glsl_version);
+	printf("GL_VERSION  : %s\n", glGetString(GL_VERSION) );
+	printf("GL_RENDERER : %s\n", glGetString(GL_RENDERER) );
+
+	resizeEvent(rwidth, rheight); ///kick a refresh
+
+	/// Load own typefaces
+	ImGuiIO &imio = ImGui::GetIO();
+	float size_pixels = 18;
+	imgui_font = imio.Fonts->AddFontFromFileTTF("/home/pi/dev/chiaki_v4l2/rpi/assets/komika.slick.ttf", size_pixels);
+
+	/// Textures for buttons, bg etc
+	int my_image_width = 0;
+	int my_image_height = 0;
+	bool imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/unknown_01.png", 	&gui_textures[0], &my_image_width, &my_image_height);
+	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps4_01.png", 			&gui_textures[1], &my_image_width, &my_image_height);
+	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps4_orange_01.png", 	&gui_textures[2], &my_image_width, &my_image_height);
+	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps4_blue_01.png", 		&gui_textures[3], &my_image_width, &my_image_height);
+	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps5_orange_01.png", 	&gui_textures[4], &my_image_width, &my_image_height);
+	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps5_blue_01.png", 		&gui_textures[5], &my_image_width, &my_image_height);
+	IM_ASSERT(imret);
+	SwitchHostImage(0);
+	LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/logo_01.png", &logo_texture, &logo_width, &logo_height);
+	logo_width = 541;
+	logo_height = 124;
 	
-	
-	printf("END Gui init\n");
+	printf("Gui init done\n");
 }
 
 
-NanoSdlWindow::~NanoSdlWindow()
+ImguiSdlWindow::~ImguiSdlWindow()
 {
-	printf("NanoSdlWindow destroyed\n");
+	printf("ImguiSdlWindow destroyed\n");
 }
 
-
-void NanoSdlWindow::SettingsDraw(const char* label, std::vector<std::string> list, std::string &select)
+/// Also switched the Help text
+void ImguiSdlWindow::SettingsDraw(int widgetID, const char* label, std::vector<std::string> list, std::string &select)
 {
-	ImGui::Text(label); ImGui::SameLine(120);
+	
+	ImGui::Dummy(ImVec2(settingIndent, 10));
+	ImGui::SameLine();
+	ImGui::Text(label);
+	ImGui::SameLine(settingIndent+130);
 	ImVec2 button_sz(200, 30);
 	
-	// try popup modal instead for bigger popup?
-	if(ImGui::Button(select.c_str(), button_sz)){
-		ImGui::OpenPopup(label);
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(button_col));
+	int nCols = 1;
+	
+	ImGui::PushID(widgetID); /// needed to differentiate same label buttons("automatic")
+		/// try popup modal instead for bigger popup?
+		if(ImGui::Button(select.c_str(), button_sz)){
+			
+			ImGui::OpenPopup(label);
+		}
+		
+		if (ImGui::BeginPopup(label))
+		{   
+			for (uint8_t i = 0; i < list.size(); i++)
+				if (ImGui::Selectable(list.at(i).c_str() )){
+					select = list.at(i);
+					// need to refresh settings in memory (which also writes to file)
+					ChangeSettingAction(widgetID, select);
+				}
+			ImGui::EndPopup();
+		}
+	ImGui::PopID();
+	ImGui::PopStyleColor(nCols);
+	
+	if (ImGui::IsItemHovered()) SwitchHelpText(label);
+}
+
+///
+void ImguiSdlWindow::SwitchHostImage(int which)
+{
+	current_host_texture = gui_textures[which];
+}
+
+
+/// Maybe use the new id variable instead?
+void ImguiSdlWindow::SwitchHelpText(const char* label)
+{
+	if(strcmp(label, "Video Decoder")==0){
+		help_text_n = 1;
+		return;
 	}
-	if (ImGui::BeginPopup(label))
-	{   
-		for (int i = 0; i < list.size(); i++)
-			if (ImGui::Selectable(list.at(i).c_str() )){
-				select = list.at(i);
-				// need to refresh settings in memory (which also writes to file)
-				// ChangeSettingAction(std::string choice)
-				ChangeSettingAction(select);
-			}
-		ImGui::EndPopup();
+	if(strcmp(label, "Video Codec")==0){
+		help_text_n = 2;
+		return;
 	}
+	if(strcmp(label, "Resolution")==0){
+		help_text_n = 3;
+		return;
+	}
+	if(strcmp(label, "Framerate")==0){
+		help_text_n = 4;
+		return;
+	}
+	if(strcmp(label, "Audio Out")==0){
+		help_text_n = 5;
+		return;
+	}	
 }
 
 /// changes what's seen in the gui
-void NanoSdlWindow::UpdateSettingsGui()
+void ImguiSdlWindow::UpdateSettingsGui()
 {
-	//settings->all_validated_settings
 	sel_decoder = settings->all_validated_settings.at(0).sess.decoder;
 	sel_vcodec = settings->all_validated_settings.at(0).sess.codec;
 	sel_resolution = settings->all_validated_settings.at(0).sess.resolution;
@@ -281,34 +387,43 @@ void NanoSdlWindow::UpdateSettingsGui()
 
 /// triggers on each settings gui change
 ///decoder, codec, resolution, fps, audio 
-void NanoSdlWindow::ChangeSettingAction(std::string choice)
+void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 {	
 	std::string setting;
 	
+	if(widgetID == 1)
 	for(std::string ch : decoder_options) {
 		if(choice == ch) {
 			setting = "decoder";
 			goto refresh;
 		}
 	}
+
+	if(widgetID == 2)
 	for(std::string ch : vcodec_options) {
 		if(choice == ch) {
 			setting = "codec";
 			goto refresh;
 		}
-	}	
+	}
+	
+	if(widgetID == 3)
 	for(std::string ch : resolution_options) {
 		if(choice == ch) {
 			setting = "resolution";
 			goto refresh;
 		}
-	}	
+	}
+	
+	if(widgetID == 4)
 	for(std::string ch : framerate_options) {
 		if(choice == ch) {
 			setting = "fps";
 			goto refresh;
 		}
-	}	
+	}
+	
+	if(widgetID == 5)
 	for(std::string ch : audio_options) {
 		if(choice == ch) {
 			setting = "audio";
@@ -320,123 +435,117 @@ void NanoSdlWindow::ChangeSettingAction(std::string choice)
 	
 
 refresh:
-	///printf("goto refresh. Setting:  %s\n", setting.c_str());
+	///printf("Refreshing Setting:  %s\n", setting.c_str());
 	settings->RefreshSettings(setting, choice);
 }
 
 /// This is the GUI main loop
 ///
-bool NanoSdlWindow::start()
+bool ImguiSdlWindow::start()
 {	
-	sleep(2);
-	io->InitFFmpeg();
-	sleep(3);
-	InitVideoGl();
-	sleep(1);	/// some time is needed here, was 1 
-	host->StartSession();
-	io->SwitchInputReceiver(std::string("session"));
-	setClientState("playing");
-	printf("Starting test run\n");
-	while(1)
-	{	
-		// Probably something to do with running between different threads?
-		
-		//HandleSDLEvents();
-		usleep(30000);
-		//glViewport(0, 0, 1280, 720); // should set in Resize() callback
-		glBindTexture(GL_TEXTURE_EXTERNAL_OES, new_texture);
-		//glBindTexture(GL_TEXTURE_2D, texture);
-		//glGetUniformLocation(program, "texture");
-		//glUseProgram(program);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-		SDL_GL_SwapWindow(sdl_window);
-	}
-	return false;
-	
-	
-	/// start gui'ing
-	bool show_demo_window = true;
-	bool show_another_window = false;
-	clear_color = ImVec4(0.45f, 0.55f, 0.60f, 0.1f);
-
 	ImGuiStyle &style = ImGui::GetStyle();
-	style.WindowRounding = 8.0f;///8
-	style.FrameRounding = 0.0f;///4
+	style.WindowRounding = 0.0f;///8
+	style.FrameRounding = 0.0f;///2
 	style.GrabRounding = style.FrameRounding;
-	
-	ImGuiIO &imio = ImGui::GetIO(); //(void)_imio;
-	imio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     /// Enable Keyboard Controls
-	imio.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      /// Enable Gamepad Controls
-	
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(button_col));
+
 	// Main loop
-	bool done = false;
 	while (!done)
-	{
-		/// POLL SDL EVENT QUEUE HERE
-		// You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
+	{	
+		/// maybe generate fresh frame texture for GL
+		if(io->nextFrameCount > prevFrameCount && !guiActive){
+			frame = io->frames_list.GetCurrentFrame();
+			UpdateAVFrame();
+			prevFrameCount = io->nextFrameCount;
+		}
+
 		HandleSDLEvents();
-		
-		//~ SDL_Event event;
-        //~ while (SDL_PollEvent(&event))
-        //~ {
-            //~ ImGui_ImplSDL2_ProcessEvent(&event);
-            //~ if (event.type == SDL_QUIT)
-                //~ done = true;
-            //~ if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(sdl_window))
-                //~ done = true;
-        //~ }
-		
-		
-		ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
-        ImGui::NewFrame();
-		
-		ImGuiWindowFlags window_flags = 0;
-		window_flags |= ImGuiWindowFlags_NoTitleBar;
-		window_flags |= ImGuiWindowFlags_NoCollapse;
-        window_flags |= ImGuiWindowFlags_NoBackground;
-        window_flags |= ImGuiWindowFlags_NoResize;
-		
-		const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-		
-		ImGui::SetNextWindowSize(ImVec2(1600, 800), ImGuiCond_Once);
-		bool* p_open = new bool;
-		if (ImGui::Begin("Parent Window", p_open, window_flags) )
-		{
+
+		if(guiActive)
+			CreateImguiWidgets();
+
+		/// GL render
+		if(guiActive || IsX11)
+			RefreshScreenDraw();
+	}
+	
+	return true;
+}
 
 
-			static ImGuiTreeNodeFlags base_flags = ImGuiTreeNodeFlags_None | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+
+void ImguiSdlWindow::CreateImguiWidgets()
+{			
+			// try move these out
+			ImGuiIO &imio = ImGui::GetIO();
+			imio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     /// Enable Keyboard Controls
+			imio.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      /// Enable Gamepad Controls
 			
-			ImGuiWindowFlags child_flags = 0;
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplSDL2_NewFrame();
+			ImGui::NewFrame();
+			
+			ImGuiWindowFlags window_flags = 0;
+			window_flags |= ImGuiWindowFlags_NoTitleBar;
+			window_flags |= ImGuiWindowFlags_NoCollapse;
+			///window_flags |= ImGuiWindowFlags_NoBackground;
+			window_flags |= ImGuiWindowFlags_NoResize;
 						
-			// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-			{
-				static float f = 0.0f;
-				static int counter = 0;
+			dspszX = imio.DisplaySize.x;
+			dspszY = imio.DisplaySize.y;
+			float botHgt = 0.5;  /// fraction of total height
+			int brdr = 20;
+			int subPanelSzX = (dspszX*0.9) / 3;
+			int subPanelSzYtop = (dspszY*0.9) * (1.0-botHgt) - 20;  /// the -20 is fudge
+			int subPanelSzYbot = (dspszY*0.9) * botHgt;
 			
-				ImGui::SetNextWindowSize(ImVec2(1400, 300), ImGuiCond_Once);
-				//printf("WinX:  %d\n", ImGui::GetContentRegionAvail().x);
+			ImGui::SetNextWindowSize(ImVec2((int)imio.DisplaySize.x*0.9, (int)imio.DisplaySize.y*0.9), ImGuiCond_Always);
+			ImGui::SetNextWindowPos(ImVec2((int)imio.DisplaySize.x*0.05, (int)imio.DisplaySize.y*0.05), ImGuiCond_Always);
+			ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(ImColor((int)clear_color.x, (int)clear_color.y, (int)clear_color.z, 64)));
+			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(ImColor(7, 20, 22, 128)));
+			
+			bool* p_open = new bool;
+			if (ImGui::Begin("Parent Window", p_open, window_flags) )  /// Invisible(or not) parent window.
+			{
+				ImGui::PopStyleColor(2); /// num colors pushed
+					
+				/// Panels For Playstation Hosts + Quit
+				ImGui::BeginChild("UpperHalfPanel", ImVec2(subPanelSzX*3, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
 				
-				//ImGui::Begin("~~~ Playstation Hosts ~~~", p_open, window_flags);              // Create a window called "Hello, world!" and append into it.
-				//ImGui::BeginChild("ChildL", ImVec2(ImGui::GetContentRegionAvail().x * 0.9f,ImGui::GetContentRegionAvail().y * 0.5), false, ImGuiWindowFlags_NavFlattened);
-				ImGui::BeginChild("ChildA", ImVec2(1000,300), false, ImGuiWindowFlags_NavFlattened);
-					ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+					ImGui::BeginChild("A", ImVec2(subPanelSzX, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
+						ImGui::Dummy(ImVec2(0, (subPanelSzYtop/2)-(20/2)) );  /// add offset space at top
+						/// Put some schnazzy useful ui thing here!
+					ImGui::EndChild();
+				
+					ImGui::SameLine();
+					ImGui::BeginChild("B", ImVec2(subPanelSzX, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
+						ImGui::Dummy(ImVec2(0, (subPanelSzYtop/2)-(psBtnSz/2)) );  /// add offset space at top
+						ImGui::Indent(subPanelSzX/2 - (int)(psBtnSz/2));							
+						///ImGui::ImageButton(ImTextureID my_image_texture, ImVec2(256, 256), const ImVec2& uv0 = ImVec2(0, 0),  const ImVec2& uv1 = ImVec2(1,1), int frame_padding = -1, const ImVec4& bg_col = ImVec4(0,0,0,0), const ImVec4& tint_col = ImVec4(1,1,1,1));    // <0 frame_padding uses default frame padding settings. 0 for no padding
+						if (ImGui::ImageButton((void*)(intptr_t)current_host_texture, ImVec2(psBtnSz, psBtnSz), ImVec2(0, 0), ImVec2(1, 1), 2) )    // <0 frame_padding uses default frame padding settings. 0 for no padding
+						{
+							hostClick();
+						}
+					ImGui::EndChild();
 
-					if (ImGui::Button(client_state.c_str()))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-					{
-						hostClick();
-					}
 
-					ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+					ImGui::SameLine();
+					ImGui::BeginChild("C", ImVec2(subPanelSzX, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
+						ImGui::Dummy(ImVec2(0, (subPanelSzYtop/2)-(20/2)) );  /// add offset space at top
+						ImGui::Indent(subPanelSzX/2 - (int)(80/2));
+						if (ImGui::Button("Quit", ImVec2(80, 40))) {
+							guiActive = 0;
+							SDL_VideoQuit();
+							SDL_AudioQuit();
+							SDL_Quit();
+							exit(0);
+						}
+					ImGui::EndChild();
+
 				ImGui::EndChild();
 				
 				
 				/// Register Dialog Popup
-				
 				if(open_regist)
 				{	
 					ImGui::OpenPopup("Register");
@@ -469,112 +578,80 @@ bool NanoSdlWindow::start()
 						ImGui::EndPopup();
 					}
 				}
-				
-				
-	
-				
-			}
-			
-			if(1)
-			{   
-				ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 100, main_viewport->WorkPos.y + 300), ImGuiCond_Once);
-				ImGui::SetNextWindowSize(ImVec2(600, 300), ImGuiCond_Once);
 
-				ImGui::BeginChild("ChildB", ImVec2(ImGui::GetContentRegionAvail().x * 0.9f,ImGui::GetContentRegionAvail().y * 0.5), false, ImGuiWindowFlags_NavFlattened);
-								
-				/// Settings popup buttons
-				SettingsDraw("Video Decoder", decoder_options, sel_decoder);
-				
-				SettingsDraw("Video Codec", vcodec_options, sel_vcodec);
-				
-				SettingsDraw("Resolution", resolution_options, sel_resolution);
+				ImGui::BeginChild("LowerHalfPanel", ImVec2(ImGui::GetWindowSize().x, subPanelSzYbot), false, ImGuiWindowFlags_NavFlattened);
+					
+					ImDrawList* draw_list = ImGui::GetWindowDrawList();
+										
+					ImGui::BeginChild("LogoPanel", ImVec2(subPanelSzX, subPanelSzYbot), false, ImGuiWindowFlags_NavFlattened);
+						draw_list->AddRectFilled(ImVec2(dspszX*0.05+brdr, dspszY*(1.0-botHgt)), ImVec2(dspszX*0.05+subPanelSzX-brdr, dspszY*0.05 + dspszY*0.9 - brdr), IM_COL32(200, 255, 64, 255), 8.0);
+						float logo_scaled_height = ((float)logo_height/(float)logo_width) * subPanelSzX;
+						draw_list->AddImage((void*)(intptr_t)logo_texture, ImVec2(dspszX*0.05+brdr+10, dspszY*0.05+subPanelSzYtop+(subPanelSzYbot-logo_scaled_height)), ImVec2(dspszX*0.05+subPanelSzX-brdr-10, dspszY*0.05+dspszY*0.9-brdr-10) );
+					ImGui::EndChild();
+					
+					ImGui::SameLine();
+					
+					/// Settings popup buttons
+					ImGui::BeginChild("SettingsPanel", ImVec2(subPanelSzX, subPanelSzYbot), false, ImGuiWindowFlags_NavFlattened);
+						
+						ImGui::Dummy(ImVec2(100, 60));
+						SettingsDraw(1, "Video Decoder", decoder_options, sel_decoder);
 
-				SettingsDraw("Framerate", framerate_options, sel_framerate);
+						SettingsDraw(2, "Video Codec", vcodec_options, sel_vcodec);
 
-				SettingsDraw("Audio Out", audio_options, sel_audio);		
+						SettingsDraw(3, "Resolution", resolution_options, sel_resolution);
 
-				if (ImGui::Button("Quit")) {
-					done = true;
-					SDL_Event user_event;
-					user_event.button.type = SDL_QUIT;
-					SDL_PushEvent(&user_event);
-					SDL_PushEvent(&user_event);
-				}
+						SettingsDraw(4, "Framerate", framerate_options, sel_framerate);
+
+						SettingsDraw(5, "Audio Out", audio_options, sel_audio);
+					ImGui::EndChild();
+					
+					ImGui::SameLine();
+					
+					/// Text Info Feedback
+					ImGui::BeginChild("InfoPanel", ImVec2(subPanelSzX, subPanelSzYbot), false, ImGuiWindowFlags_NavFlattened);
+						int wrap_width = (dspszX*0.95-brdr-10) - (dspszX*0.05+subPanelSzX*2+brdr); /// from coords below
+						ImGui::PushTextWrapPos(wrap_width); /// is width, not coordinate
+						ImGui::Dummy(ImVec2(100, 10));
+						ImGui::Indent(10);
+						ImGui::Text(ChiakiGetHelpText(help_text_n));
+						ImGui::PopTextWrapPos();
+						/// 2d point position corners, in window(?) space. Clipped by edges of parent.
+						draw_list->AddRectFilled(ImVec2(dspszX*0.05+subPanelSzX*2+brdr, dspszY*(1.0-botHgt)), ImVec2(dspszX*0.95-brdr, dspszY*0.05 + dspszY*0.9 - brdr), IM_COL32(5, 5, 5, 64), 8.0);
+					ImGui::EndChild();
 					
 				ImGui::EndChild();
-			}
-			
-			
-			
-						
-	}/// END parent window
-	ImGui::End();
-
-	/// Rendering
-	RefreshScreenDraw();
-
-	} // END while(!done)
-	
-
+			}/// END parent window
+			ImGui::End();
 }
 
 
-void NanoSdlWindow::HandleSDLEvents()
+/// For during Gui only - see IO for session SDL event handling
+void ImguiSdlWindow::HandleSDLEvents()
 {
 	SDL_Event event;
-	if(takeInput)
+
+	if(takeInput)///takeInput
 	{
-	/// reading events from the event queue
+		/// pulling events from the event queue
 		while (SDL_PollEvent(&event))
-		{	
+		{
 			ImGui_ImplSDL2_ProcessEvent(&event);
+			
 			switch (event.type)
 			{
 				case SDL_QUIT:
-					running = 0;
+					guiActive = 0;
+					SDL_VideoQuit();
+					SDL_AudioQuit();
+					SDL_Quit();
 					exit(0);
 					break;
 					
 				///case SDL_CONTROLLERBUTTONUP:
 				case SDL_CONTROLLERBUTTONDOWN:
-				{
-					//printf("Joy Button!\n");
-					ChiakiControllerState press = io->GetState();
-					
-					//~ if(press.buttons == CHIAKI_CONTROLLER_BUTTON_DPAD_UP )
-					//~ {
-						//~ break;
-					//~ }
-					//~ if(press.buttons == CHIAKI_CONTROLLER_BUTTON_DPAD_DOWN )
-					//~ {
-						//~ break;
-					//~ }
-					//~ if(press.buttons == CHIAKI_CONTROLLER_BUTTON_DPAD_LEFT )
-					//~ {
-						//~ break;
-					//~ }
-					//~ if(press.buttons == CHIAKI_CONTROLLER_BUTTON_DPAD_RIGHT )
-					//~ {
-						//~ break;
-					//~ }
-					//~ if(press.buttons == CHIAKI_CONTROLLER_BUTTON_CROSS )
-					//~ {
-						//~ ///printf("Select Pressed\n");
-						//~ SDL_Event user_event;
-						//~ user_event.button.type = SDL_MOUSEBUTTONDOWN;
-						//~ user_event.button.button = SDL_BUTTON_LEFT;
-						//~ user_event.button.clicks = 1;
-						//~ SDL_PushEvent(&user_event);
-						//~ SDL_Delay(250);///ms
-						//~ SDL_Event user_event2;
-						//~ user_event2.button.type = SDL_MOUSEBUTTONUP;
-						//~ user_event2.button.button = SDL_BUTTON_LEFT;
-						//~ user_event2.button.clicks = 1;
-						//~ SDL_PushEvent(&user_event2);
-						//~ break;
-					//~ }
-					
-					
+				{	
+					// Not needed here ChiakiControllerState press = io->GetState();	
 					break;
 				}
 				case SDL_JOYDEVICEADDED:
@@ -592,7 +669,10 @@ void NanoSdlWindow::HandleSDLEvents()
 					switch (event.key.keysym.sym)
 					{
 					  case SDLK_ESCAPE:
-						running = 0;
+						guiActive = 0;
+						SDL_VideoQuit();
+						SDL_AudioQuit();
+						SDL_Quit();
 						exit(0);
 						break;
 					  case SDLK_F11:
@@ -600,7 +680,7 @@ void NanoSdlWindow::HandleSDLEvents()
 						if (fullscreen)
 						{
 						  SDL_SetWindowFullscreen(sdl_window, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
-						  SDL_SetWindowSize(sdl_window, 1920, 1080);
+						  //SDL_SetWindowSize(sdl_window, 1920, 1080);
 						}
 						else
 						{
@@ -608,42 +688,70 @@ void NanoSdlWindow::HandleSDLEvents()
 						}
 						break;
 						
-					 // default:
-						//break;
+					  default:
+						break;
 					}
-				}
-				case SDL_MOUSEBUTTONDOWN:
-				{
-				  //mouseClickEvent();
-				  //break; let pass through
+					break;
 				}
 				
-				//default:
-				//	break;
-			}
-			
-			//this->onEvent(event);
-		}
-	}
+				case SDL_WINDOWEVENT:
+				{
+					if (event.window.event == SDL_WINDOWEVENT_RESIZED)
+					{
+						resizeEvent(event.window.data1, event.window.data2);
+					}
+					break;
+				}
+
+				default:
+					break;
+			}/// END switch:
+		}/// END while (SDL_PollEvent
+	}/// END  if(takeInput)
+
+}
+
+
+void ImguiSdlWindow::RefreshScreenDraw()
+{
+	glViewport(glViewGeom[0], glViewGeom[1], glViewGeom[2], glViewGeom[3]);
+
+	if(guiActive)
+		ImGui::Render();
 	
+	if(guiActive)
+		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+	else
+		glClearColor(0,0,0,0);
+
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	/// Draw video frame texture
+	///glUseProgram(program);//not needed
+	if(!guiActive)
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+	if(guiActive)
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+	///SDL_GL_SwapWindow(sdl_window);	// use below one?
+	SDL_RenderPresent(sdl_renderer);	///Waits for vsync, use for gl video 
 }
 
 // Now using glDmaTexture
-int NanoSdlWindow::InitVideoGl()
+int ImguiSdlWindow::InitVideoGl()
 {
 	GLuint vbo;
 	GLint pos;
 	GLint uvs;
 	
-	// Use v-sync=(1)
-	SDL_GL_SetSwapInterval(0);
-	///SDL_HINT_RENDER_VSYNC 0
-	// Disable depth test and face culling.
+	/// Use v-sync=(1)
+	SDL_GL_SetSwapInterval(1);
+	
+	/// Disable depth test and face culling.
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
-	printf("GL_VERSION  : %s\n", glGetString(GL_VERSION) );
-	printf("GL_RENDERER : %s\n", glGetString(GL_RENDERER) );
-	
+
 	/// Shader
 	program = common_get_shader_program(vertex_shader_source, fragment_shader_source);
 	pos = glGetAttribLocation(program, "position");
@@ -660,9 +768,8 @@ int NanoSdlWindow::InitVideoGl()
 	glVertexAttribPointer(pos, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
 	glVertexAttribPointer(uvs, 2, GL_FLOAT, GL_FALSE, 0,  (void*)sizeof(vertices) ); /// last is offset to loc in buf memory
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	
-	/// Texture init
-	    
+
+
     /// Test with static data texture (from above) works. (edit shader too)
     //~ glBindTexture(GL_TEXTURE_2D, texture);
 	//~ glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);//or GL_LINEAR
@@ -675,79 +782,32 @@ int NanoSdlWindow::InitVideoGl()
                     //~ texture_data);
 	//~ glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 8, 8, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, texture_data);
     /// End Test texture
-    
-	//~ glGenTextures(1, &texture);
-	//~ glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
-	//~ //checkGl();  //ok
-	//~ glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    //~ glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//~ //checkGl(); //ok
-	//~ glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1280, 720, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-	//~ //checkGl();//err code 1280
-	
+
+    /// Texture
+	glEnable(GL_TEXTURE_EXTERNAL_OES);
 	glHint(GL_GENERATE_MIPMAP_HINT, GL_FASTEST);
+	glGenTextures(1, &texture);
 	glUseProgram(program);
-	//glGetUniformLocation(program, "texture");
-	
-	// below gets err code 1280
-	//glTexSubImage2D(GL_TEXTURE_EXTERNAL_OES, 0, 0,0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);///nullptr should work
+	///glGetUniformLocation(program, "texture");
 
-	// Gl err code GL_INVALID_ENUM	1280	Set when an enumeration parameter is not legal 
-	
-	//glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
-	//glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
-	//glTexSubImage2D(GL_TEXTURE_EXTERNAL_OES, 0, 0,0,1,1,GL_RGBA, GL_UNSIGNED_BYTE, nullptr); // last = uv_default ?? or nullptr
-	//glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1, 1, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, nullptr);
-	//glGetUniformLocation(program, "texture");
-	//glUseProgram(program);
-	//glGetUniformLocation(program, "texture");
-	
-	
-	
-	/// Texture Init from 'tearing'
-	//~ GLuint targetTexture;
-	//~ glGenTextures(1, &targetTexture);
-	//~ glBindTexture(GL_TEXTURE_2D, targetTexture);
-	//~ glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, mode->width, mode->height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-
-	
-
-	
 	return 1;
 }
 
-
-
-bool NanoSdlWindow::UpdateFromGUI(AVFrame *frame)
+/// Has to be run from the 'main' thread, currently here from ImguiSdlWindow
+/// Running from play thread causes Gl context problems
+bool ImguiSdlWindow::UpdateAVFrame()
 {	
 	
 	// perf test
 	//return true; // Still 17-18% CPU!
-	
-	
-	//printf("\nBEGIN AVOpenGLFrame::Update\n");
-	//auto f = QOpenGLContext::currentContext()->extraFunctions();
-	//printf("PIX Format in Update():  %d\n", frame->format); // 181 is the one!
-	//printf("DRM_PRIME as int in Update(): %d\n", AV_PIX_FMT_DRM_PRIME); //prints 182
-	
+					
 	if(frame->format != AV_PIX_FMT_DRM_PRIME)
 	{	
-		printf("Inside Check.  Ie not a AV_PIX_FMT_DRM_PRIME Frame\n");
+		printf("UpdateFromGUI: Not a AV_PIX_FMT_DRM_PRIME AVFrame, %d\n", frame->format);
 		return false;
 	}
-	
-	//needed for aspect ratio fitting
-	int width = frame->width;
-	int height = frame->height;
 
-	
-	
-	/// My one
 	const AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
-	int fd = -1;
-	fd = desc->objects[0].fd;
-	//printf("FD: %d\n", fd);
-	//ORIG GLuint texture = 1;
 
 	EGLint attribs[50];
 	EGLint *a = attribs;
@@ -759,7 +819,7 @@ bool NanoSdlWindow::UpdateFromGUI(AVFrame *frame)
 	*a++ = av_frame_cropped_height(frame);
 	*a++ = EGL_LINUX_DRM_FOURCC_EXT;
 	*a++ = desc->layers[0].format;
-
+	
 	int i, j;
 	for (i = 0; i < desc->nb_layers; ++i) {
             for (j = 0; j < desc->layers[i].nb_planes; ++j) {
@@ -786,16 +846,13 @@ bool NanoSdlWindow::UpdateFromGUI(AVFrame *frame)
 	 *a = EGL_NONE;
 	
 	
+	// this can be done not on every frame
 	SDL_SysWMinfo WMinfo;
 	SDL_VERSION(&WMinfo.version);
 	SDL_GetWindowWMInfo(sdl_window, &WMinfo);
 	EGLNativeDisplayType hwnd = WMinfo.info.x11.display;  /// WMinfo.info.kmsdrm.drm_fd, WMinfo.info.x11.display
 	EGLDisplay egl_display = eglGetDisplay(hwnd);
 	
-	///SDL_GL_GetCurrentContext   ORIG!
-	//EGLDisplay egl_display = eglGetCurrentDisplay();
-	
-///printf("EGLDisplay:  %d\n", egl_display);///6062456, 28434872, 8860088
 	const EGLImage image = eglCreateImageKHR( egl_display,
                                               EGL_NO_CONTEXT,
                                               EGL_LINUX_DMA_BUF_EXT,
@@ -805,245 +862,21 @@ bool NanoSdlWindow::UpdateFromGUI(AVFrame *frame)
 		return -1;
 	}
 
-	/// his
-	glGenTextures(1, &texture);
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, nullptr);
-
+	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, nullptr);
 	new_texture = texture;
-
-	eglDestroyImageKHR(&egl_display, image);
-	
-	//printf("END AVOpenGLFrame::Update\n\n");
+		
 	return true;
 }
 
-
-
-bool NanoSdlWindow::UpdateAVFrame(AVFrame *frame)
+void ImguiSdlWindow::registClick(std::string acc_id, std::string pin)
 {	
-	
-	// TEMP TEST
-	UpdateFromGUI(frame);
-	return true;
-	
-	
-	
-	if(frame->format != AV_PIX_FMT_DRM_PRIME)
-	{	
-		printf("UpdateAVFrame: Not a AV_PIX_FMT_DRM_PRIME Frame, %d\n", frame->format);
-		return false;
-	}
-	
-	//needed for aspect ratio fitting
-	int width = frame->width;
-	int height = frame->height;
-
-	
-	
-	/// My one
-	const AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
-	int fd = -1;
-	fd = desc->objects[0].fd;
-	//printf("FD: %d\n", fd);
-	//GLuint texture = 1;
-	texture = 1;
-	
-	int TEST_fd=-1;
-
-	EGLint attribs[50];
-	EGLint *a = attribs;
-	const EGLint *b = texgen_attrs;
-	
-	*a++ = EGL_WIDTH;
-	*a++ = av_frame_cropped_width(frame);
-	*a++ = EGL_HEIGHT;
-	*a++ = av_frame_cropped_height(frame);
-	*a++ = EGL_LINUX_DRM_FOURCC_EXT;
-	*a++ = desc->layers[0].format;
-
-	int i, j;
-	for (i = 0; i < desc->nb_layers; ++i) {
-            for (j = 0; j < desc->layers[i].nb_planes; ++j) {
-                const AVDRMPlaneDescriptor * const p = desc->layers[i].planes + j;
-                const AVDRMObjectDescriptor * const obj = desc->objects + p->object_index;
-                *a++ = *b++;
-                *a++ = obj->fd; TEST_fd = obj->fd;
-                *a++ = *b++;
-                *a++ = p->offset;
-                *a++ = *b++;
-                *a++ = p->pitch;
-                if (obj->format_modifier == 0) {
-                   b += 2;
-                }
-                else {
-                   *a++ = *b++;
-                   *a++ = (EGLint)(obj->format_modifier & 0xFFFFFFFF);
-                   *a++ = *b++;
-                   *a++ = (EGLint)(obj->format_modifier >> 32);
-                }
-            }
-     }
-	
-	 *a = EGL_NONE;
-	
-	SDL_SysWMinfo WMinfo;
-	SDL_VERSION(&WMinfo.version);
-	SDL_GetWindowWMInfo(sdl_window, &WMinfo);
-	EGLNativeDisplayType hwnd = WMinfo.info.x11.display;  /// WMinfo.info.kmsdrm.drm_fd, WMinfo.info.x11.display
-	EGLDisplay egl_display = eglGetDisplay(hwnd);
-	//printf("EGLDisplay A:  %d\n", egl_display);// should not be 0 or negative
-	
-	//EGLint *major=nullptr, *minor=nullptr;
-	//eglInitialize(egl_display, major, minor);
-	//segfaults printf("EGL Init: v%d.%d\n", *major, *minor);
-	
-	//EGLNativeDisplayType hhh = EGLNativeDisplayType(EGL_DEFAULT_DISPLAY);
-	//EGLDisplay _egl_display = eglGetDisplay(hhh);
-	
-	///SDL_GL_GetCurrentDisplay() but only SDL2 2.0.20
-	/// None of these seem to work. Error is NOT the egl_display !?!!
-	//EGLDisplay egl_display = eglGetCurrentDisplay();///old orig, no work in X11 or CLI. Fine in Chiaki-gui
-	//EGLDisplay egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);/// ok but eglCreateImageKHR no work in either
-	//printf("EGLDisplay B:  %d\n", _egl_display);// should not be 0 or negative	
-	if(egl_display == EGL_NO_DISPLAY){
-		printf("UpdateAVFrame:  No EGL Display found\n");
-		return -1;
-	}
-
-	//SDL_GLContext glcontext = SDL_GL_CreateContext(sdl_window);
-
-
-	/// Should test with the egl_vout code? No its using lots of custom code.
-	/// Need a test with SDL + eglCreateImageKHR
-	
-	const EGLImage image = eglCreateImageKHR( egl_display,
-                                              EGL_NO_CONTEXT,
-                                              EGL_LINUX_DMA_BUF_EXT,
-                                              NULL,
-                                              attribs);
-                         
-    ///
-    //~ const EGLint pbuf_attribs[] = {
-                    //~ EGL_WIDTH, 1280,
-                    //~ EGL_HEIGHT, 720,
-                    //~ EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_XRGB8888,  /// takes 16 or 32 bits per pixel (or 8 probably)
-					//~ EGL_DMA_BUF_PLANE0_FD_EXT, TEST_fd,
-					//~ EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
-					//~ EGL_DMA_BUF_PLANE0_PITCH_EXT, 1280*4,
-                    //~ EGL_NONE};
-   	//~ const EGLImage image = eglCreateImageKHR( egl_display,
-                                              //~ EGL_NO_CONTEXT,
-                                              //~ EGL_LINUX_DMA_BUF_EXT,
-                                              //~ NULL,
-                                              //~ pbuf_attribs);                 
-                    
-	/// Success reported here!
-
-	if (!image) {	///or EGL_NO_IMAGE_KHR
-		printf("Failed to create EGLImage\n");
-		return -1;
-	}
-	return 1;
-	glGenTextures(1, &texture);
-	glEnable(GL_TEXTURE_EXTERNAL_OES);
-	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
-	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
-	checkGl();
-	new_texture = texture;
-	eglDestroyImageKHR(&egl_display, image);
-	return 1;
-
-	/// his
-	//~ glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
-	//~ uint8_t uv_default[] = {0x7f, 0x7f};
-	//~ glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1280, 720, 0, GL_RGBA, GL_UNSIGNED_BYTE, uv_default);
-	//~ glGetUniformLocation(program, "texture");
-	
-	//glEnable(GL_TEXTURE_EXTERNAL_OES);
-	//glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
-	//glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	//glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	//glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
-	/// Success reported here!
-	
-	
-	
-	
-	//glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-	new_texture = texture;
-	
-	glGetUniformLocation(program, "texture");
-	eglDestroyImageKHR(&egl_display, image);
-	
-
-	/*
-	glGenTextures(1, &texture);
-	glEnable(GL_TEXTURE_EXTERNAL_OES);
-	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
-	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	
-	uint8_t uv_default[] = {0x7f, 0x7f};
-	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
-	//NOT glTexSubImage2D(GL_TEXTURE_EXTERNAL_OES, 0, 0,0,1,1,GL_RGBA, GL_UNSIGNED_BYTE, nullptr); // last = uv_default ?? or nullptr
-	//NOT glTexImage2D(GL_TEXTURE_EXTERNAL_OES, 0, GL_RGBA, 1, 1, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, nullptr);
-	
-	glGetUniformLocation(program, "texture");
-	
-	// This one needed?
-	eglDestroyImageKHR(&egl_display, image);
-	*/
-	//printf("Ran through NanoSdlWindow::UpdateAVFrame\n");
-}
-
-
-void NanoSdlWindow::RefreshScreenDraw()
-{	
-	ImGuiIO &imio = ImGui::GetIO(); //(void)_imio;
-	imio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     /// Enable Keyboard Controls
-	imio.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      /// Enable Gamepad Controls
-	
-	ImGui::Render();
-	glViewport(0, 0, (int)imio.DisplaySize.x, (int)imio.DisplaySize.y);
-	
-	glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-	//glClear(GL_COLOR_BUFFER_BIT);// remove when playing video!
-	
-	/// Draw video frame
-	//~ glBindTexture(GL_TEXTURE_EXTERNAL_OES, da->texture);
-    //~ glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    //~ eglSwapBuffers(de->setup.egl_dpy, de->setup.surf);
-	//glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
-	glUseProgram(program);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	
-	//glDeleteTextures(1, &texture); // needed? slows down mebbe
-	
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-	SDL_GL_SwapWindow(sdl_window);	
-}
-
-void NanoSdlWindow::registClick(std::string acc_id, std::string pin)
-{	
-	//~ std::string pin = input_pin->value();
-	//~ std::string accountID = input_accId->value();
-	
 	host->RegistStart(acc_id, pin);
 }
 
-int NanoSdlWindow::hostClick()
+int ImguiSdlWindow::hostClick()
 {
 	printf("Host Click\n");
-	int ret;
 	
 	/// gui:  unknown, notreg, standby, waiting, ready, playing   (this is 'client_state')
 
@@ -1061,75 +894,71 @@ int NanoSdlWindow::hostClick()
 		return 0;
 	}
 	
-	if(client_state == "standby") /// orange, sleeping  (blue is Off ?)
+	if(client_state == "standby") /// orange
 	{
-		printf("Sending Wakeup!\n");
-		uint64_t credential = (uint64_t)strtoull(host->connect_info.regist_key, NULL, 16);
-		chiaki_discovery_wakeup(&log, NULL,	host->connect_info.host, credential, 0);// Last is this->IsPS5()		
+		host->SendWakeup();
 		setClientState("waiting");
 		return 0;
 	}
 	
-	if(client_state == "ready") /// white, good to go
+	if(client_state == "ready") /// blue
 	{
 		printf("Starting Play session!\n");
 		
-		//SDL_MinimizeWindow(sdl_window);
-
-		/// transfer drm_fd
+		/// transfer drm_fd, only used for CLI/non-x11
 		SDL_SysWMinfo WMinfo;
 		SDL_VERSION(&WMinfo.version);
 		SDL_GetWindowWMInfo(sdl_window, &WMinfo);
 		printf("SDL drm_fd:  %d\n", WMinfo.info.kmsdrm.drm_fd);
 		io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
 		
-		
-		ret = io->InitFFmpeg();
+		io->InitFFmpeg();
 		InitVideoGl();
 		//sleep(1);	/// some time is needed here, was 1 
 		host->StartSession();
+		guiActive = 0;
 		io->SwitchInputReceiver(std::string("session"));
 		setClientState("playing");
 		return 0;
 	}
-	
-	//~ if(ret==0) {  /// 0 is good
-		//~ printf("Will try starting the session\n");
-		//~ host.StartSession();
-	//~ }
-	
+		
 	return 0;
 }
 
-void NanoSdlWindow::PressSelect()
+void ImguiSdlWindow::PressSelect()
 {
 	
 }
 
-void NanoSdlWindow::setClientState(std::string state)
+/// Can't be called too early, now unsafely using 'all_read_settings'
+void ImguiSdlWindow::setClientState(std::string state)
 {	
-	/// host: unknown, standby, ready					  (this is host 'state')
+	/// host: unknown, standby, ready					 		 (this is host 'state')
 	/// gui:  unknown, notreg, standby, waiting, ready, playing   (this is 'client_state')
+	///printf("State now:  %s\n", state.c_str());
 	
-	//~ if(settings->all_host_settings.size() == 0) { // just first one for now
-		//~ host_icon->setCaption("notreg");
-		//~ client_state = "notreg";
-		//~ return;
-	//~ }
-
-	if(state == "unknown") {
-			//host_icon->setCaption(" - ? - ");
-			client_state = state;
-	} else {
-			//host_icon->setCaption(state);
-			client_state = state;
+	client_state = state;
+	
+	if(state == "unknown")	SwitchHostImage(0);
+	else {
+		if(settings->all_read_settings.at(0).isPS5 == "1")
+		{
+			if(state == "standby")	SwitchHostImage(4);
+			if(state == "ready")	SwitchHostImage(5);
+		}
+			
+		if(settings->all_read_settings.at(0).isPS5 == "0")
+		{
+			if(state == "standby")	SwitchHostImage(2);
+			if(state == "waiting")	SwitchHostImage(1);
+			if(state == "ready")	SwitchHostImage(3);
+		}
 	}
 	
 }
 
 
-
-//~ bool NanoSdlWindow::keyboardEvent(int key, int scancode, int action, int modifiers)
+//~ bool ImguiSdlWindow::keyboardEvent(int key, int scancode, int action, int modifiers)
 //~ {
 	//~ //printf("Key press\n");	
 
@@ -1138,35 +967,64 @@ void NanoSdlWindow::setClientState(std::string state)
 	//~ return false;
 //~ }
 
-void NanoSdlWindow::restoreGui()
-{
+
+void ImguiSdlWindow::restoreGui()
+{	
 	io->FiniFFmpeg();
-	io->ShutdownStreamDrm(); /// good. clears stream frame buffer
-	
-	SDL_MaximizeWindow(sdl_window);
+	if(!IsX11)
+		io->ShutdownStreamDrm(); /// good. clears stream frame buffer
+
+	ImGui::Render();  /// Needed for some flush thing
+	guiActive = 1;
 	host->StartDiscoveryService();  /// Did I ever stop it?
 	io->SwitchInputReceiver(std::string("gui"));
-
 }
 
-bool NanoSdlWindow::resizeEvent(int w, int h)
+/// Needs to trigger in session
+bool ImguiSdlWindow::resizeEvent(int w, int h)
 {	
-	printf("New Window Size: %dx%d\n", w, h);
+	//printf("New Window Size: %dx%d\n", w, h);
 	
-	return false;
+	/// Calc values to use for GL render portal
+	GLsizei vp_width = 64;
+	GLsizei vp_height = 48;
+	GLsizei vp_xoffs = 0;
+	GLsizei vp_yoffs = 0;
+	float aspect = 1280.0 / 720.0;  /// Assuming always 1.77777
+	
+	if(aspect < w/h)  /// landscape
+	{
+		vp_width = (GLsizei)(h * aspect);
+		vp_height = h;
+		vp_xoffs = (w - vp_width)/2;
+	}
+	else   /// portrait
+	{
+		vp_width = w;
+		vp_height = (GLsizei)(w / aspect);
+		vp_yoffs = (h - vp_height)/2;
+	}
+	
+	glViewGeom[0] = vp_xoffs;
+	glViewGeom[1] = vp_yoffs;
+	glViewGeom[2] = vp_width;
+	glViewGeom[3] = vp_height;
+	/// for use in glViewport(x, y, w, h)
+
+	/// Calculate some dynamic widget sizes
+	int btnMax=256;
+	int btnMin=172;
+	int a = RemapChi(w, 1280, 1920, btnMin, btnMax);
+	int b = RemapChi(h, 720, 1080, btnMin, btnMax);
+	psBtnSz = std::min(a,b);
+	settingIndent = RemapChi(w, 1280, 1900, 0, 100);
+	///printf("Indent:  %d\n", settingIndent);
+	
+	
+	return true;
 }
 
-//~ void NanoSdlWindow::mouseClickEvent()
+//~ void ImguiSdlWindow::mouseClickEvent()
 //~ {
 	//~ printf("mouseClickEvent\n");
 //~ }
-
-//~ void NanoSdlWindow::draw(SDL_Renderer* renderer)
-//~ {	
-//~ }
-
-//~ void NanoSdlWindow::drawContents()
-//~ {
-//~ }
-
-

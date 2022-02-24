@@ -11,7 +11,7 @@ message("${CMAKE_SOURCE_DIR}")
 
 #find_package(SDL2 MODULE REQUIRED)
 find_package(SDL2 2.0.17 REQUIRED)
-#find_package(SDL2IMAGE REQUIRED)
+find_package(SDL2IMAGE REQUIRED)
 find_package(SDL2TTF REQUIRED)
 include_directories(${SDL2TTF_INCLUDE_DIR})
 #include_directories(${SDL2_IMAGE_INCLUDE_DIR})
@@ -27,6 +27,7 @@ include_directories(
 	"${CMAKE_SOURCE_DIR}/lib/include/"
      "${CMAKE_SOURCE_DIR}/third-party/imgui/"
      "${CMAKE_SOURCE_DIR}/third-party/imgui/backends/"
+     "${CMAKE_SOURCE_DIR}/setsu/include/"
 	"${SDL2_INCLUDE_DIRS}"
 	/usr/include/libdrm
      /usr/include)
@@ -39,7 +40,9 @@ list(APPEND IMGUI_SOURCE_FILES
      ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_tables.cpp
      ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_widgets.cpp
      ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_sdl.cpp
-     ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_opengl3.cpp)
+     ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_opengl3.cpp
+     # ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_demo.cpp
+     )
 
 add_executable(chiaki-rpi
 				src/drmprime_out.c
@@ -49,8 +52,8 @@ add_executable(chiaki-rpi
 				src/settings.cpp
                     src/gui.cpp
                     ${IMGUI_SOURCE_FILES})
-
+                    
 # ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY} already in chiaki-lib
 # -lEGS makes it build, but is that the right one or can SDL provide?
-target_link_libraries(chiaki-rpi chiaki-lib ${SDL2_LIBRARIES} ${SDL2TTF_LIBRARY} -ldrm -lGLESv2 -lEGL)
+target_link_libraries(chiaki-rpi chiaki-lib ${SDL2_LIBRARIES} ${SDL2TTF_LIBRARY} ${SDL2IMAGE_LIBRARY} setsu -ldrm -lGLESv2 -lEGL)
 #find DependInfo.cmake  for clues!

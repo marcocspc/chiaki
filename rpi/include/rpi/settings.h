@@ -58,14 +58,15 @@ class RpiSettings
 		void WriteYaml(std::vector<rpi_settings_host> all_host_settings);
 		void PrintHostSettings(rpi_settings_host host);
 		void RefreshSettings(std::string setting, std::string choice);  /// both memory and file
-		ChiakiCodec GetChiakiCodec(std::string choice);
-		ChiakiVideoResolutionPreset GetChiakiResolution(std::string choice);
-		ChiakiVideoFPSPreset GetChiakiFps(std::string choice);
 		
-		//std::vector<std::string> sessionSettingsNames;
 		//std::vector<rpi_settings_host> all_host_settings; 		// old validated settings
 		std::vector<rpi_settings_host> all_read_settings; 		// NEW read settings
 		std::vector<rpi_settings_host> all_validated_settings; 	// NEW validated settings, session runs off these. 
+		
+		ChiakiCodec GetChiakiCodec(std::string choice);
+		ChiakiVideoResolutionPreset GetChiakiResolution(std::string choice);
+		ChiakiVideoFPSPreset GetChiakiFps(std::string choice);
+	
 	
 	private:
 	

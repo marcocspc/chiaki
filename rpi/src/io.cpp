@@ -1,6 +1,6 @@
 #include <rpi/io.h>
 
-
+#define SETSU_UPDATE_INTERVAL_MS 4
 
 /// Gamepad special input actions:
 ///
@@ -8,48 +8,85 @@
 ///
 ///
 
-//~ static EGLint texgen_attrs[] = {
-   //~ EGL_DMA_BUF_PLANE0_FD_EXT,
-   //~ EGL_DMA_BUF_PLANE0_OFFSET_EXT,
-   //~ EGL_DMA_BUF_PLANE0_PITCH_EXT,
-   //~ EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
-   //~ EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT,
-   //~ EGL_DMA_BUF_PLANE1_FD_EXT,
-   //~ EGL_DMA_BUF_PLANE1_OFFSET_EXT,
-   //~ EGL_DMA_BUF_PLANE1_PITCH_EXT,
-   //~ EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT,
-   //~ EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT,
-   //~ EGL_DMA_BUF_PLANE2_FD_EXT,
-   //~ EGL_DMA_BUF_PLANE2_OFFSET_EXT,
-   //~ EGL_DMA_BUF_PLANE2_PITCH_EXT,
-   //~ EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT,
-   //~ EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT,
-//~ };
 
-
-static enum AVPixelFormat get_hw_format(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts)
+AVFramesList::AVFramesList()
 {
-    const enum AVPixelFormat *p;
-
-    for (p = pix_fmts; *p != -1; p++) {
-        if (*p == AV_PIX_FMT_DRM_PRIME) {
-            return *p;
+	for(auto i=0; i<size; i++)
+	{
+		frameslist[i] = new AVFrame;
+		frameslist[i] = av_frame_alloc();
 	}
-    }
+}
 
-    fprintf(stderr, "Failed to get HW surface format.\n");
-    return AV_PIX_FMT_NONE;
+AVFramesList::~AVFramesList()
+{
+}
+
+void AVFramesList::Increment()///current
+{	
+	/// current == next-1
+	// is already min?
+	//~ if(next == 0) current = size-1;
+	//~ else current = next-1;
+	current=next;
+	
+	///printf("Curr:  %d    Next:  %d\n", current, next);
+}
+
+AVFrame* AVFramesList::GetNextFreed()
+{
+	//is already max?
+	if(next == size-1) next=0;
+	else next++;
+	
+	//av_frame_free(&frameslist[next]);
+	frameslist[next] = av_frame_alloc();//should check for success
+	return frameslist[next];
+}
+
+AVFrame* AVFramesList::GetCurrentFrame()
+{
+	return frameslist[current];
+}
+
+void AVFramesList::FreeLatest()
+{
+	printf("FreeLatest()\n");
+	av_frame_free(&frameslist[current]);
+}
+
+
+
+static void SessionSetsuCb(SetsuEvent *event, void *user);
+static void SessionSetsuCb(SetsuEvent *event, void *user)
+{	
+	IO *io = (IO *)user;
+	
+	io->HandleSetsuEvent(event);
 }
 
 IO::IO()
 {
-	printf("Rpi IO created\n");
+	// maybe Ill have to do some timer thing to poll every now and then
+	audio_out_devices.clear();
+	int i, count = SDL_GetNumAudioDevices(0);
+	for (i = 0; i < count; ++i) {
+		audio_out_devices.push_back(SDL_GetAudioDeviceName(i, 0));
+		SDL_Log("Audio device %d: %s", i, SDL_GetAudioDeviceName(i, 0));
+	}
+	
+	/// Setsu - touchpad, rumble
+	setsu_motion_device = nullptr;
+	chiaki_controller_state_set_idle(&setsu_state);
+	orient_dirty = true;
+	chiaki_orientation_tracker_init(&orient_tracker);
+	setsu = setsu_new();
 
+	printf("Rpi IO created\n");
 }
 
 int IO::Init(Host *host)
 {	
-	ChiakiErrorCode err;
 	this->host = host;
 	
 	return 0;
@@ -73,6 +110,8 @@ IO::~IO()
 		}
 	}
 	
+	setsu_free(setsu);
+	
 	SDL_Quit();
 
 	printf("Rpi IO destroyed\n");
@@ -80,8 +119,8 @@ IO::~IO()
 
 int IO::InitGamepads()
 {		
-	// Initializing SDL with Joystick support (Joystick, game controller and haptic subsystems)
-	if(SDL_Init( SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC ) < 0)
+	/// Initializing SDL with Joystick support (Joystick, game controller and haptic subsystems)
+	if(SDL_Init( SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC ) < 0)
 	{
 		fprintf(stderr, "Error: Couldn't initialize SDL. %s\n", SDL_GetError());
 		return 1;
@@ -126,22 +165,25 @@ void IO::SwitchInputReceiver(std::string target)	/// gui/session
 	}
 }
 
-/// The input for the session
+/// The input for the play session
 void IO::HandleJoyEvent(void)
 {	
 	SDL_Event event;
 	
-	if(takeInput)
+	if(takeInput) // Warning this flushes the SDL_USEREVENTs
 	{
 	/// reading events from the event queue
 		while (SDL_PollEvent(&event))
-		{
+		{	
+
 			switch (event.type)
 			{
 				case SDL_QUIT:
 					exit(0);
 					break;
 				case SDL_CONTROLLERBUTTONUP:
+					controller_state = GetState();
+					break;
 				case SDL_CONTROLLERBUTTONDOWN:
 					//printf("Buttonpress\n");
 					controller_state = GetState();
@@ -159,6 +201,19 @@ void IO::HandleJoyEvent(void)
 					printf("Gamepad removed\n");
 					RefreshGamepads();
 					break;
+					
+				case SDL_USEREVENT:
+					SDL_PushEvent(&event); // pass back to queue, might cause inf loop!
+					break;
+					
+				case SDL_WINDOWEVENT:
+				{
+					if (event.window.event == SDL_WINDOWEVENT_RESIZED)
+					{	
+						host->gui->resizeEvent(event.window.data1, event.window.data2);
+					}
+					break;
+				}
 				
 				default:
 					break;
@@ -215,12 +270,138 @@ void IO::SpecialControlHandler()
 	kill_combo.buttons |= CHIAKI_CONTROLLER_BUTTON_MOON;
 	if(controller_state.buttons == kill_combo.buttons) {
 		///printf("Kill Session - Restore Gui\n");
-		chiaki_session_stop(&this->host->session);		
+		chiaki_session_stop(&this->host->session);
 		host->gui->restoreGui();
 	}
 	
 	
 }
+
+void IO::SetsuPoll()
+{
+	setsu_poll(setsu, SessionSetsuCb, this);
+	//chiaki_orientation_tracker_apply_to_controller_state(&orient_tracker, &setsu_state);
+}
+
+void IO::HandleSetsuEvent(SetsuEvent *event)
+{
+	if(!setsu)
+		return;
+	switch(event->type)
+	{
+		case SETSU_EVENT_DEVICE_ADDED:
+			switch(event->dev_type)
+			{
+				case SETSU_DEVICE_TYPE_TOUCHPAD:
+					// connect all the touchpads!
+					if(setsu_connect(setsu, event->path, event->dev_type))
+						printf("Connected Setsu Touchpad Device %s\n", event->path);
+					else
+						printf("Failed to connect to Setsu Touchpad Device %s\n", event->path);
+					break;
+				case SETSU_DEVICE_TYPE_MOTION:
+					// connect only one motion since multiple make no sense
+					if(setsu_motion_device)
+					{
+						printf("Setsu Motion Device %s detected there is already one connected\n",
+								event->path);
+						break;
+					}
+					setsu_motion_device = setsu_connect(setsu, event->path, event->dev_type);
+					if(setsu_motion_device)
+						printf("Connected Setsu Motion Device %s\n", event->path);
+					else
+						printf("Failed to connect to Setsu Motion Device %s\n", event->path);
+					break;
+			}
+			break;
+		
+		case SETSU_EVENT_DEVICE_REMOVED:
+			switch(event->dev_type)
+			{
+				case SETSU_DEVICE_TYPE_TOUCHPAD:
+					printf("Setsu Touchpad Device %s disconnected", event->path);
+					for(auto it=setsu_ids.begin(); it!=setsu_ids.end();)
+					{
+						///if(it.key().first == event->path)
+						if(it->first.first == event->path)
+						{
+							chiaki_controller_state_stop_touch(&setsu_state, it->second);
+							setsu_ids.erase(it++);
+						}
+						else
+							it++;
+					}
+					//SendFeedbackState();
+					break;
+				case SETSU_DEVICE_TYPE_MOTION:
+					if(!setsu_motion_device || strcmp(setsu_device_get_path(setsu_motion_device), event->path))
+						break;
+					printf("Setsu Motion Device %s disconnected", event->path);
+					setsu_motion_device = nullptr;
+					chiaki_orientation_tracker_init(&orient_tracker);
+					orient_dirty = true;
+					break;
+			}
+			break;
+		case SETSU_EVENT_TOUCH_DOWN:
+			break;
+		case SETSU_EVENT_TOUCH_UP:
+			for(auto it=setsu_ids.begin(); it!=setsu_ids.end(); it++)
+			{
+				if(it->first.first == setsu_device_get_path(event->dev) && it->first.second == event->touch.tracking_id)
+				{
+					chiaki_controller_state_stop_touch(&setsu_state, it->second);
+					setsu_ids.erase(it);
+					break;
+				}
+			}
+			// SendFeedbackState();
+			break;
+		case SETSU_EVENT_TOUCH_POSITION: {
+			std::pair<std::string, SetsuTrackingId> k =  { setsu_device_get_path(event->dev), event->touch.tracking_id };
+			auto it = setsu_ids.find(k);
+			if(it == setsu_ids.end())
+			{
+				int8_t cid = chiaki_controller_state_start_touch(&setsu_state, event->touch.x, event->touch.y);
+				if(cid >= 0)
+					setsu_ids[k] = (uint8_t)cid;
+				else
+					break;
+			}
+			else
+				chiaki_controller_state_set_touch_pos(&setsu_state, it->second, event->touch.x, event->touch.y);
+			// SendFeedbackState();
+			break;
+		}
+		case SETSU_EVENT_BUTTON_DOWN:
+			setsu_state.buttons |= CHIAKI_CONTROLLER_BUTTON_TOUCHPAD;
+			break;
+		case SETSU_EVENT_BUTTON_UP:
+			setsu_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_TOUCHPAD;
+			break;
+		case SETSU_EVENT_MOTION:
+			chiaki_orientation_tracker_update(&orient_tracker,
+					event->motion.gyro_x, event->motion.gyro_y, event->motion.gyro_z,
+					event->motion.accel_x, event->motion.accel_y, event->motion.accel_z,
+					event->motion.timestamp);
+			orient_dirty = true;
+			break;
+	}
+}
+
+void IO::SendFeedbackState()
+{
+	ChiakiControllerState state;
+	chiaki_controller_state_set_idle(&state);
+
+	// setsu is the one that potentially has gyro/accel/orient so copy that directly first
+	state = setsu_state;
+
+	chiaki_controller_state_or(&state, &state, &controller_state);///merge
+	chiaki_session_set_controller_state(&host->session, &state);
+}
+
 
 void IO::ShutdownStreamDrm()
 {
@@ -228,76 +409,69 @@ void IO::ShutdownStreamDrm()
 }
 
 
-/// Set h264 or hevc here
-int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door
+int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 {	
-	printf("Begin InitFFmpeg\n");
-	
+	///printf("Begin InitFFmpeg\n");
 	///av_log_set_level(AV_LOG_DEBUG);
 	
 	AVBufferRef * hw_device_ctx = nullptr;
-	enum AVPixelFormat hw_pix_fmt = AV_PIX_FMT_NONE;
 	const char *hw_decoder_name = "drm";
 	enum AVHWDeviceType type;
-	AVCodec *av_codec;  //rename 'decoder' ?
-	//const char *codec_name = "h264_v4l2m2m";  /// or "hevc"
-	char *codec_name = "h264_v4l2m2m";
-	//codec_name = "hevc";
-		
+	AVCodec *av_codec;
+	
+	const char *codec_name = "h264_v4l2m2m";
+	ChiakiCodec chi_codec = host->gui->settings->GetChiakiCodec(host->gui->settings->all_validated_settings.at(0).sess.codec);
+	if(chi_codec == CHIAKI_CODEC_H265)
+		codec_name = "hevc";
+
 	type = av_hwdevice_find_type_by_name(hw_decoder_name);
 	if(type == AV_HWDEVICE_TYPE_NONE)
 	{
-		CHIAKI_LOGE(&log, "Hardware decoder \"%s\" not found", hw_decoder_name);
-		//goto error_codec_context;
+		printf("Hardware decoder \"%s\" not found", hw_decoder_name);
 		return 1;
 	}
 	
-	//dpo = drmprime_out_new(drm_fd);  // I think I need to nicely close this after!?
-    if (dpo == NULL) {
-        fprintf(stderr, "Failed to open drmprime output\n");
-        //return 1;
-    }
+	if(!host->gui->IsX11)
+	{
+		printf("Initiating new drm render device");
+		dpo = drmprime_out_new(drm_fd);
+		if (dpo == nullptr) {
+			fprintf(stderr, "Failed to open drmprime output\n");
+			return 1;
+		}
+	}
 	
 	av_codec = avcodec_find_decoder_by_name(codec_name);
 	if(!av_codec)
 	{
 		CHIAKI_LOGE(&log, "%s Codec not available", codec_name);
-		//goto error_mutex;
 		return 1;
 	}
-	
-	hw_pix_fmt = AV_PIX_FMT_DRM_PRIME; /// new, but doesn't really matter
 
 	codec_context = avcodec_alloc_context3(av_codec);
 	if(!codec_context)
 	{
 		CHIAKI_LOGE(&log, "Failed to alloc codec context");
-		//goto error_mutex;
 		return 1;
 	}
 
-	//   EXPERIMENTAL - from the switch code- Can't tell if it does anything.
-	//
-	//~ codec_context->flags |= AV_CODEC_FLAG_LOW_DELAY;
-	//~ codec_context->flags2 |= AV_CODEC_FLAG2_FAST;
-	//~ codec_context->flags2 |= AV_CODEC_FLAG2_CHUNKS; // was off
-	//~ codec_context->thread_type = FF_THREAD_SLICE;
-	//~ codec_context->thread_count = 4;
-	
-	/// Negotiating pixel format. Must return drm_prime
-	codec_context->get_format = get_hw_format;  /// was func: get_hw_format;
-	///[h264_v4l2m2m @ 0x1165d10] Format drm_prime chosen by get_format().
-	///[h264_v4l2m2m @ 0x1165d10] avctx requested=181 (drm_prime); get_format requested=181 (drm_prime)
+	/// Needs to match actual session resolution
+	int width_setting = 1280;
+	int height_setting = 720;
+	ChiakiVideoResolutionPreset resolution_preset = host->gui->settings->GetChiakiResolution(host->gui->settings->all_validated_settings.at(0).sess.resolution);
+	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_1080p) { width_setting=1920; height_setting=1080; }
+	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_720p)  { width_setting=1280; height_setting=720; }
+	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_540p)  { width_setting=960;  height_setting=540; }
+    codec_context->coded_height = height_setting;
+	codec_context->coded_width = width_setting;
+	codec_context->pix_fmt = AV_PIX_FMT_DRM_PRIME;  /// request a DRM frame
 
-	codec_context->pix_fmt = AV_PIX_FMT_DRM_PRIME;   /* request a DRM frame */
-    codec_context->coded_height = 720;
-	codec_context->coded_width = 1280;
-	
 	if (avcodec_open2(codec_context, av_codec, nullptr) < 0) {
 		printf("Could not open codec\n");
 		return 1;
 	}
 	
+	/// Must have gotten drm_prime
 	/// If you get 182 or other you are sourcing the wrong header file
 	printf("Actual Fmt: %d\n", codec_context->pix_fmt); // 181
 	
@@ -309,14 +483,13 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door
 	printf("Finish InitFFmpeg\n");
 	return 0;
 
-error_codec_context:
 	if(hw_device_ctx)
 		av_buffer_unref(&hw_device_ctx);
 	avcodec_free_context(&codec_context);
-error_mutex:
+//error_mutex:
 	//chiaki_mutex_fini(&mtx);
-	this->mtx.lock();
-	return CHIAKI_ERR_UNKNOWN;
+//	this->mtx.lock();
+//	return CHIAKI_ERR_UNKNOWN;
 }
 
 int IO::FiniFFmpeg()
@@ -325,31 +498,28 @@ int IO::FiniFFmpeg()
 	avcodec_free_context(&codec_context);
 	//if(decoder->hw_device_ctx)
 	//	av_buffer_unref(&decoder->hw_device_ctx);
+	return 1;
 }
 
 
-/// For kmsdrm render
+/// For kmsdrm render and gl render
 bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 {	
-	/// for frame dump only
+	//printf("In VideoCB\n");
+	/// for frame dumps only
 	size_t size;
 	AVFrame *sw_frame = nullptr;
 	uint8_t *buffer = NULL;
-	
-	
-	///printf("In VideoCB\n");
-	///printf("%d\n", buf_size);
-	
-	this->mtx.lock();
-	
+
 	AVPacket packet;
-	av_init_packet(&packet);
+	av_init_packet(&packet); // Deprecated2021 NEW->  AVPacket* packet = av_packet_alloc();
 	packet.data = buf;
 	packet.size = buf_size;
 	int ret = 0;
 		    
-    if(&packet)
-	{
+   // if(&packet)
+    if(1)
+	{	
 		ret = avcodec_send_packet(codec_context, &packet);
 		/// printf("Send Packet (sample_cb) return;  %d\n", r);
 		/// In particular, we don't expect AVERROR(EAGAIN), because we read all
@@ -358,42 +528,43 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 		  printf("Error return in send_packet\n");
 	    }
 	}
-	 
-	//this->mtx.unlock();
-	//this->mtx.lock();
 	
-
+	///NEED TO FREE THE CLASS FRAME
+	av_frame_free(&frame);
+	
     while (1) {
-        if (!(frame = av_frame_alloc())) {
+        if (!(frame = av_frame_alloc())) { //can this be removed with queue?
             fprintf(stderr, "Can not alloc frame\n");
             ret = AVERROR(ENOMEM);
             goto the_end;
         }
-		
+        
+        frame = frames_list.GetNextFreed();/// get empty frame pointer, allocated
 		ret = avcodec_receive_frame(codec_context, frame); //ret 0 ==success
+
 		///printf("PIX Format after receive_frame:  %d\n", frame->format);//181
 		if (ret == 0) {
-			//printf("Frame Successfully Decoded\n");
-			
-			if(1)//host->gui->IsX11
-				host->gui->UpdateAVFrame(frame); /// openGl pipe
-			else
+			///printf("Frame Successfully Decoded\n");
+						
+			if(host->gui->IsX11)
+			{	
+				frames_list.Increment();/// increments 'current' for pull
+				nextFrameCount++;
+			} else {
 				drmprime_out_display(dpo, frame); /// drm pipe
+			}
 
-			this->mtx.unlock();
 		}
 		if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
 			printf("AVERROR(EAGAIN)\n");
 			av_frame_free(&frame);
-			//return 0; /// goes sends/gets another packet.
 		} else if (ret < 0) {
 			fprintf(stderr, "Error while decoding\n");
 		}
 
 	
 	
-	///https://github.com/jc-kynesim/hello_drmprime/blob/master/hello_drmprime.c  
-	///if(tmpCount == 150)
+	/// This is just a debug section to write out raw rgb frame
 	if(0)
 	{
 		sw_frame = av_frame_alloc();
@@ -438,32 +609,34 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 		
 		fclose(output_file);
 		printf("FRAMEDUMP!\n");
+		tmpCount++;
 	}
-	tmpCount++;
-
-
-
-
-
-   
-
+	
+	
 fail:	/// this happens even without fail
-	av_frame_free(&frame);
+	///av_frame_free(&frame);
 	av_packet_unref(&packet);
-	this->mtx.unlock();
 	if (ret < 0)
 		return 0;
 the_end:
-	this->mtx.unlock();
 	return 1;
-	} // END while(1)
+	} /// END while(1)
 	
 	return 1;
 }
 
+//not used!?
+void IO::FreeAVFrame()
+{
+}
+
+/// happens on Session start
 void IO::InitAudioCB(unsigned int channels, unsigned int rate)
 {
-	SDL_AudioSpec want, have, test;
+	
+	printf("Init Audio CB\n");
+	
+	SDL_AudioSpec want;
 	SDL_memset(&want, 0, sizeof(want));
 	
 	//source
@@ -473,26 +646,34 @@ void IO::InitAudioCB(unsigned int channels, unsigned int rate)
 	//[I]   rate = 48000
 	//[I]   frame size = 480
 	//[I]   unknown = 1
-	unsigned int channels_ = 2;
-	unsigned int rate_ = 48000;
+	//unsigned int channels_ = 2;
+	//unsigned int rate_ = 48000;
+
 	
-	want.freq = rate_;
+	want.freq = rate;
 	want.format = AUDIO_S16SYS;
-	// 2 == stereo
-	want.channels = channels_;
+	want.channels = channels;  /// 2 == stereo
 	want.samples = 1024;
 	want.callback = NULL;
-
-	if(this->sdl_audio_device_id <= 0)
+	
+	std::string current_out_choice = host->gui->settings->all_validated_settings.at(0).sess.audio_device;
+	printf("Session Audio OUT:  %s\n", current_out_choice.c_str());
+	
+	if(audio_out_devices.size() > 0)
 	{
+		sdl_audio_device_id = SDL_OpenAudioDevice(current_out_choice.c_str() , 0, &want, NULL, 0);
+	}
+	
+	if(this->sdl_audio_device_id <= 0)
+	{	
 		// the chiaki session might be called many times
 		// open the audio device only once
-		this->sdl_audio_device_id = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
+		sdl_audio_device_id = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
 	}
 
 	if(this->sdl_audio_device_id <= 0)
 	{
-		//CHIAKI_LOGE(this->log, "SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
+		///CHIAKI_LOGE(this->log, "SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
 		printf("ERROR SDL_OpenAudioDevice\n");
 	}
 	else
@@ -501,13 +682,12 @@ void IO::InitAudioCB(unsigned int channels, unsigned int rate)
 	}
 }
 
-
 void IO::AudioCB(int16_t *buf, size_t samples_count)
 {	
-	///printf("In AudioCB\n");
+	//printf("In AudioCB\n");
 	//printf("AudCB: %d\n", samples_count);
 	
-	for(int x = 0; x < samples_count * 2; x++)
+	for(uint32_t x = 0; x < samples_count * 2; x++)
 	{
 		// boost audio volume
 		int sample = buf[x] * 1.80;
@@ -526,7 +706,7 @@ void IO::AudioCB(int16_t *buf, size_t samples_count)
 		else
 			buf[x] = (int16_t)sample;
 	}
-
+	
 	int audio_queued_size = SDL_GetQueuedAudioSize(this->sdl_audio_device_id);
 	if(audio_queued_size > 16000)
 	{
@@ -539,4 +719,7 @@ void IO::AudioCB(int16_t *buf, size_t samples_count)
 	int success = SDL_QueueAudio(this->sdl_audio_device_id, buf, sizeof(int16_t) * samples_count * 2);
 	if(success != 0)
 		CHIAKI_LOGE(&log, "SDL_QueueAudio failed: %s\n", SDL_GetError());
+		
+	//printf("END IO::AudioCB\n");
+	return;
 }
