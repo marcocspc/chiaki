@@ -15,6 +15,7 @@ option(CHIAKI_ENABLE_GUI "Enable Qt GUI" OFF)
 option(CHIAKI_ENABLE_ANDROID "Enable Android (Use only as part of the Gradle Project)" OFF)
 option(CHIAKI_ENABLE_BOREALIS "Enable Borealis GUI (For Nintendo Switch or PC)" OFF)
 tri_option(CHIAKI_ENABLE_SETSU "Enable libsetsu for touchpad input from controller" AUTO)
+#added below
 option(CHIAKI_LIB_ENABLE_OPUS "Use Opus as part of Chiaki Lib" ON)
 if(CHIAKI_ENABLE_GUI OR CHIAKI_ENABLE_BOREALIS)
 	set(CHIAKI_FFMPEG_DEFAULT ON)
