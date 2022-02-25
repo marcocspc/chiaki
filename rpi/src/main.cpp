@@ -12,8 +12,8 @@
 #define HOSTS_MAX	4		// was 16
 #define DROP_PINGS	3
 
-#define WinWidth 1920
-#define WinHeight 1080
+#define WinWidth 1280
+#define WinHeight 720
 
 // TO-DOs:
 // aspect ratio for kmsdrm
