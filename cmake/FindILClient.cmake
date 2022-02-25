@@ -1,11 +1,20 @@
 # Provides ILClient::ILClient
-# (Raspberry Pi-specific video decoding stuff, very specific for libraspberrypi0 and libraspberrypi-doc)
 
+#/opt/vc/lib/libbcm_host.so
+find_path(ILClient_LIB_DIR libbcm_host.so
+	PATHS /opt/vc/include
+	PATHS /opt/vc/lib
+	NO_DEFAULT_PATH)
+	
+message(${ILClient_LIB_DIR})
+
+
+#/opt/vc/lib/libvcilcs.a
 set(_required_libs
-	/opt/vc/lib/libbcm_host.so
-	/opt/vc/lib/libvcilcs.a
-	/opt/vc/lib/libvchiq_arm.so
-	/opt/vc/lib/libvcos.so)
+	${ILClient_LIB_DIR}/libbcm_host.so
+	${ILClient_LIB_DIR}/libvcilcs.a
+	${ILClient_LIB_DIR}/libvchiq_arm.so
+	${ILClient_LIB_DIR}/libvcos.so)
 
 unset(_libvars)
 foreach(_lib ${_required_libs})
@@ -21,8 +30,10 @@ endforeach()
 
 find_path(ILClient_INCLUDE_DIR bcm_host.h
 	PATHS /opt/vc/include
+	PATHS /usr/include
 	NO_DEFAULT_PATH)
 
+# /opt/vc/src/hello_pi/libs/ilclient/ilclient.c
 find_path(ILClient_SOURCE_DIR ilclient.c
 	PATHS /opt/vc/src/hello_pi/libs/ilclient)
 
@@ -41,6 +52,7 @@ if(ILClient_FOUND)
 			"${ILClient_SOURCE_DIR}/ilclient.c"
 			"${ILClient_SOURCE_DIR}/ilcore.c")
 		target_include_directories(ilclient PUBLIC
+			/home/pi/dev/missing_ilclient/opt_vc/include
 			"${ILClient_INCLUDE_DIR}"
 			"${ILClient_SOURCE_DIR}")
 		target_compile_definitions(ilclient PUBLIC
