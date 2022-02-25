@@ -21,9 +21,15 @@ include_directories(${SDL2TTF_INCLUDE_DIR})
 
 #include_directories("${FFMPEG_INCLUDE_DIRS}") # needed for correct AV_PIX_FMT_DRM_PRIME==181
 
+find_package(FFMPEG COMPONENTS avcodec avutil avformat REQUIRED)
+message("${FFMPEG_VERSION}")
+message("${FFMPEG_INCLUDE_DIRS}")
+message("${FFMPEG_LIBRARIES}")
+
+
 include_directories(
-	"${FFMPEG_INCLUDE_DIRS}" 			# needed for correct AV_PIX_FMT_DRM_PRIME==181
-	"${CMAKE_SOURCE_DIR}/rpi/include/"
+     "${FFMPEG_INCLUDE_DIRS}"
+     "${CMAKE_SOURCE_DIR}/rpi/include/"
 	"${CMAKE_SOURCE_DIR}/lib/include/"
      "${CMAKE_SOURCE_DIR}/third-party/imgui/"
      "${CMAKE_SOURCE_DIR}/third-party/imgui/backends/"
@@ -41,7 +47,6 @@ list(APPEND IMGUI_SOURCE_FILES
      ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_widgets.cpp
      ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_sdl.cpp
      ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_opengl3.cpp
-     # ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_demo.cpp
      )
 
 add_executable(chiaki-rpi
@@ -55,5 +60,5 @@ add_executable(chiaki-rpi
                     
 # ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY} already in chiaki-lib
 # -lEGS makes it build, but is that the right one or can SDL provide?
-target_link_libraries(chiaki-rpi chiaki-lib ${SDL2_LIBRARIES} ${SDL2TTF_LIBRARY} ${SDL2IMAGE_LIBRARY} setsu -ldrm -lGLESv2 -lEGL)
+target_link_libraries(chiaki-rpi chiaki-lib ${FFMPEG_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2TTF_LIBRARY} ${SDL2IMAGE_LIBRARY} setsu -ldrm -lGLESv2 -lEGL)
 #find DependInfo.cmake  for clues!

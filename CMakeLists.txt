@@ -10,22 +10,22 @@ macro(tri_option name desc default)
 endmacro()
 
 option(CHIAKI_ENABLE_TESTS "Enable tests for Chiaki" OFF)
-option(CHIAKI_ENABLE_CLI "Enable CLI for Chiaki" OFF)
-option(CHIAKI_ENABLE_GUI "Enable Qt GUI" OFF)
-option(CHIAKI_ENABLE_ANDROID "Enable Android (Use only as part of the Gradle Project)" OFF)
-option(CHIAKI_ENABLE_BOREALIS "Enable Borealis GUI (For Nintendo Switch or PC)" OFF)
 tri_option(CHIAKI_ENABLE_SETSU "Enable libsetsu for touchpad input from controller" AUTO)
 #added below
 option(CHIAKI_LIB_ENABLE_OPUS "Use Opus as part of Chiaki Lib" ON)
-if(CHIAKI_ENABLE_GUI OR CHIAKI_ENABLE_BOREALIS)
-	set(CHIAKI_FFMPEG_DEFAULT ON)
-else()
-	set(CHIAKI_FFMPEG_DEFAULT AUTO)
-endif()
-tri_option(CHIAKI_ENABLE_FFMPEG_DECODER "Enable FFMPEG video decoder" ${CHIAKI_FFMPEG_DEFAULT})
+
+
+
+#if(CHIAKI_ENABLE_GUI OR CHIAKI_ENABLE_BOREALIS)
+#	set(CHIAKI_FFMPEG_DEFAULT ON)
+#else()
+#	set(CHIAKI_FFMPEG_DEFAULT AUTO)
+#endif()
+#tri_option(CHIAKI_ENABLE_FFMPEG_DECODER "Enable FFMPEG video decoder" ${CHIAKI_FFMPEG_DEFAULT})
 #option(CHIAKI_ENABLE_FFMPEG_DECODER ON)
-tri_option(CHIAKI_ENABLE_PI_DECODER "Enable Raspberry Pi-specific video decoder (requires libraspberrypi0 and libraspberrypi-doc)" AUTO)
-option(CHIAKI_ENABLE_PI_DECODER OFF)
+
+#tri_option(CHIAKI_ENABLE_PI_DECODER "Enable Raspberry Pi-specific video decoder (requires libraspberrypi0 and libraspberrypi-doc)" AUTO)
+#option(CHIAKI_ENABLE_PI_DECODER OFF)
 option(CHIAKI_LIB_ENABLE_MBEDTLS "Use mbedtls instead of OpenSSL as part of Chiaki Lib" OFF)
 option(CHIAKI_LIB_OPENSSL_EXTERNAL_PROJECT "Use OpenSSL as CMake external project" OFF)
 option(CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER "Use SDL Gamecontroller for Input" ON)
@@ -39,7 +39,7 @@ set(CHIAKI_VERSION_PATCH 1)
 set(CHIAKI_VERSION ${CHIAKI_VERSION_MAJOR}.${CHIAKI_VERSION_MINOR}.${CHIAKI_VERSION_PATCH})
 
 set(CPACK_PACKAGE_NAME "chiaki")
-set(CPACK_PACKAGE_DESCRIPTION "Open Source PS4 remote play client")
+set(CPACK_PACKAGE_DESCRIPTION "Open Source PS4|PS5 remote play client")
 set(CPACK_PACKAGE_VERSION_MAJOR ${CHIAKI_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${CHIAKI_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${CHIAKI_VERSION_PATCH})
@@ -48,18 +48,9 @@ set(CPACK_DEBIAN_PACKAGE_DESCRIPTION ${CPACK_PACKAGE_DESCRIPTION})
 set(CPACK_DEBIAN_PACKAGE_SECTION "games")
 include(CPack)
 
-set(CHIAKI_IS_SWITCH ${NSWITCH})
-#set(CHIAKI_IS_SWITCH ON)
-
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_CURRENT_SOURCE_DIR}/setsu/cmake")
 
 set(CMAKE_CXX_STANDARD 11)
-
-if(CHIAKI_IS_SWITCH)
-	# force mbedtls as crypto lib
-	#set(CHIAKI_LIB_ENABLE_MBEDTLS ON)
-	add_definitions(-D__SWITCH__)
-endif()
 
 if(CHIAKI_USE_SYSTEM_JERASURE)
 	if(CHIAKI_USE_SYSTEM_JERASURE STREQUAL AUTO)
@@ -95,8 +86,9 @@ if(CHIAKI_LIB_ENABLE_MBEDTLS)
 	add_definitions(-DCHIAKI_LIB_ENABLE_MBEDTLS)
 endif()
 
-if(CHIAKI_ENABLE_FFMPEG_DECODER)
-	
+
+
+if(0)
 	set(CMAKE_PREFIX_PATH "/home/pi/dev/rpi-ffmpeg/out/armv7-buster-shared-rel/install")
 	find_package(PkgConfig REQUIRED)	
 	pkg_check_modules(PC_FFMPEG avcodec avutil avformat)
@@ -144,40 +136,23 @@ if(CHIAKI_ENABLE_FFMPEG_DECODER)
 	#~ endif()
 endif()
 
-if(CHIAKI_ENABLE_FFMPEG_DECODER)
-	message(STATUS "FFMPEG Decoder enabled")
-else()
-	message(STATUS "FFMPEG Decoder disabled")
-endif()
+find_package(Nanopb QUIET)
 
-if(CHIAKI_ENABLE_PI_DECODER)
-	find_package(ILClient)
-	if(ILClient_FOUND)
-		set(CHIAKI_ENABLE_PI_DECODER ON)
-	else()
-		if(NOT CHIAKI_ENABLE_PI_DECODER STREQUAL AUTO)
-			message(FATAL_ERROR "
-CHIAKI_ENABLE_PI_DECODER is set to ON, but its dependencies (ilclient source and libs) could not be resolved.
-The Raspberry Pi Decoder is only supported on Raspberry Pi OS and requires libraspberrypi0 and libraspberrypi-doc.")
-		endif()
-		set(CHIAKI_ENABLE_PI_DECODER OFF)
-	endif()
-endif()
+#~ if(CHIAKI_ENABLE_FFMPEG_DECODER)
+	#~ message(STATUS "FFMPEG Decoder enabled")
+#~ else()
+	#~ message(STATUS "FFMPEG Decoder disabled")
+#~ endif()
+
+
 # FRED
 set(CHIAKI_ENABLE_PI_DECODER OFF)
 
-
-if(CHIAKI_ENABLE_PI_DECODER)
-	message(STATUS "Pi Decoder enabled")
-else()
-	message(STATUS "Pi Decoder disabled")
-endif()
-
 add_subdirectory(lib)
 
-if(CHIAKI_ENABLE_CLI)
-	add_subdirectory(cli)
-endif()
+#~ if(CHIAKI_ENABLE_CLI)
+	#~ add_subdirectory(cli)
+#~ endif()
 
 if(CHIAKI_ENABLE_SETSU)
 	find_package(Udev QUIET)
@@ -203,22 +178,9 @@ else()
 	message(STATUS "Setsu disabled")
 endif()
 
-if(CHIAKI_ENABLE_GUI)
-	#add_subdirectory(setsu)
-	add_subdirectory(gui)
-endif()
-
 if(CHIAKI_ENABLE_TESTS)
 	enable_testing()
 	add_subdirectory(test)
-endif()
-
-if(CHIAKI_ENABLE_ANDROID)
-	add_subdirectory(android/app)
-endif()
-
-if(CHIAKI_ENABLE_BOREALIS)
-	add_subdirectory(switch)
 endif()
 
 #fred rpi
