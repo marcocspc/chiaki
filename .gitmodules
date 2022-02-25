@@ -10,6 +10,6 @@
 [submodule "third-party/gf-complete"]
 	path = third-party/gf-complete
 	url = https://git.sr.ht/~thestr4ng3r/gf-complete
-[submodule "imgui"]
+[submodule "third-party/imgui"]
 	path = third-party/imgui
 	url = https://github.com/ocornut/imgui
