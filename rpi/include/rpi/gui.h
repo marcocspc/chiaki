@@ -107,7 +107,7 @@ class IO;
 class ImguiSdlWindow
 {
 	public:
-		ImguiSdlWindow(SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* sdl_renderer, SDL_GLContext* gl_context);
+		ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* sdl_renderer, SDL_GLContext* gl_context);
 		~ImguiSdlWindow();
 		Host *host = nullptr; 	/// controller state, session
 		IO *io = nullptr;	    /// input, decode, rendering, audio

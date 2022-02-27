@@ -33,6 +33,11 @@ int main()
 	//chiaki_log_init(&log, 4, NULL, NULL);  // 1 is the log level, 4 also good, try 14
 	//chiaki_log_init(&log, CHIAKI_LOG_ALL & ~CHIAKI_LOG_VERBOSE, NULL, NULL);
 	
+	int bufsize = 256;
+	char pathbuf[bufsize];
+	readlink("/proc/self/exe", pathbuf, bufsize);
+	///printf ("Linux Path:  %s\n", pathbuf);
+	
 	SDL_version linked;
 	SDL_GetVersion(&linked);
 	printf("SDL version linked: %d.%d.%d\n", linked.major, linked.minor, linked.patch);
@@ -99,7 +104,7 @@ int main()
 	///SDL_SetRenderDrawBlendMode(sdl_renderer, SDL_BLENDMODE_BLEND);
 			
 	/// GUI start
-	ImguiSdlWindow *screen = new ImguiSdlWindow(sdl_window, WinWidth, WinHeight, sdl_renderer, &gl_context);
+	ImguiSdlWindow *screen = new ImguiSdlWindow(pathbuf, sdl_window, WinWidth, WinHeight, sdl_renderer, &gl_context);
 	screen->start();
 	
 	/// Finish

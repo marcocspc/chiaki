@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <unistd.h>		/// sleep()
 #include <algorithm>	/// min,max
+#include <vector>
 
 #include "rpi/gui.h"
 #include "rpi/host.h"
@@ -13,10 +14,6 @@
 #include "rpi/stb_image.h"	/// has to be here
 
 #include <drm_fourcc.h>
-
-#define WinWidth 1920
-#define WinHeight 1080
-
 
 
 int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
@@ -215,7 +212,7 @@ static EGLint texgen_attrs[] = {
    EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT,
 };
 
-ImguiSdlWindow::ImguiSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* renderer, SDL_GLContext* gl_context)
+ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* renderer, SDL_GLContext* gl_context)
 {
 	sdl_window = pwindow;
 	sdl_renderer = renderer;
@@ -278,26 +275,66 @@ ImguiSdlWindow::ImguiSdlWindow( SDL_Window* pwindow, int rwidth, int rheight, SD
 
 	resizeEvent(rwidth, rheight); ///kick a refresh
 
-	/// Load own typefaces
+	/// Load Assets - Linux only path handling
+	/// Linux Path eg:  /home/pi/dev/chiaki_testbuild/build/rpi/chiaki-rpi
+	///
+	std::string fullpath(pathbuf);
+	std::vector<std::string> fullpathvec;
+	std::string mainpath("");
+	const char* p;
+	for(p = strtok( pathbuf, "/" );  p;  p = strtok( NULL, "/" ))
+	{
+		///printf( "SPLIT:  %s\n", p );
+		fullpathvec.push_back(p);
+	}
+	for(uint8_t i=0; i<(fullpathvec.size()-3); i++)
+	{
+		mainpath += "/";
+		mainpath += fullpathvec.at(i);
+	}
+	mainpath += "/rpi/assets/";
+	///printf("MAIN PATH:  %s\n", mainpath.c_str());
+
 	ImGuiIO &imio = ImGui::GetIO();
 	float size_pixels = 18;
-	imgui_font = imio.Fonts->AddFontFromFileTTF("/home/pi/dev/chiaki_v4l2/rpi/assets/komika.slick.ttf", size_pixels);
+	imgui_font = imio.Fonts->AddFontFromFileTTF(strcat((char*)mainpath.c_str(), "komika.slick.ttf"), size_pixels);
 
 	/// Textures for buttons, bg etc
 	int my_image_width = 0;
 	int my_image_height = 0;
-	bool imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/unknown_01.png", 	&gui_textures[0], &my_image_width, &my_image_height);
-	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps4_01.png", 			&gui_textures[1], &my_image_width, &my_image_height);
-	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps4_orange_01.png", 	&gui_textures[2], &my_image_width, &my_image_height);
-	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps4_blue_01.png", 		&gui_textures[3], &my_image_width, &my_image_height);
-	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps5_orange_01.png", 	&gui_textures[4], &my_image_width, &my_image_height);
-	imret = LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/ps5_blue_01.png", 		&gui_textures[5], &my_image_width, &my_image_height);
+	std::string tx0 = mainpath + "unknown_01.png";
+	bool imret = LoadTextureFromFile(tx0.c_str(), &gui_textures[0], &my_image_width, &my_image_height);
 	IM_ASSERT(imret);
-	SwitchHostImage(0);
-	LoadTextureFromFile("/home/pi/dev/chiaki_v4l2/rpi/assets/logo_01.png", &logo_texture, &logo_width, &logo_height);
+
+	std::string tx1 = mainpath + "ps4_01.png";
+	imret = LoadTextureFromFile(tx1.c_str(), &gui_textures[1], &my_image_width, &my_image_height);
+	IM_ASSERT(imret);
+
+	std::string tx2 = mainpath + "ps4_orange_01.png";
+	imret = LoadTextureFromFile(tx2.c_str(), &gui_textures[2], &my_image_width, &my_image_height);
+	IM_ASSERT(imret);
+
+	std::string tx3 = mainpath + "ps4_blue_01.png";
+	imret = LoadTextureFromFile(tx3.c_str(), &gui_textures[3], &my_image_width, &my_image_height);
+	IM_ASSERT(imret);
+
+	std::string tx4 = mainpath + "ps5_orange_01.png";
+	imret = LoadTextureFromFile(tx4.c_str(), &gui_textures[4], &my_image_width, &my_image_height);
+	IM_ASSERT(imret);
+	
+	std::string tx5 = mainpath + "ps5_blue_01.png";
+	imret = LoadTextureFromFile(tx5.c_str(), &gui_textures[5], &my_image_width, &my_image_height);
+	IM_ASSERT(imret);
+	
+	SwitchHostImage(0); /// to 'unknown' as default start
+	
+	std::string tx6 = mainpath + "logo_01.png";
+	LoadTextureFromFile(tx6.c_str(), &logo_texture, &logo_width, &logo_height);
+	IM_ASSERT(imret);
 	logo_width = 541;
 	logo_height = 124;
 	
+
 	printf("Gui init done\n");
 }
 
