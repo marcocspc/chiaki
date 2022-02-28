@@ -71,6 +71,13 @@ int main()
       return 1;
     }
     
+    SDL_GLContext gl_context;
+    
+    bool IsX11 = true;
+    if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0)///0 is match
+		 IsX11 = true;
+	else IsX11 = false;
+    
 	SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1"); /// Seems to work!
 	SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "1"); // NEW Testing, 0=glx, "By default SDL will use GLX when both are present."
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2"); /// Seems to work and be enough!
@@ -101,7 +108,12 @@ int main()
 			//~ renderer_index = it;
 		//~ }
 	//~ }
-
+	
+	// Having this here makes wokrk ok in X11
+	if(IsX11) {
+		gl_context = SDL_GL_CreateContext(sdl_window);
+		SDL_GL_MakeCurrent(sdl_window, gl_context);
+	}
 
 	// "can't window EGL/GBM surfaces on window creation"
 	// EGL_NO_SURFACE ?
@@ -119,8 +131,13 @@ int main()
 	printf("SDL_RENDER_DRIVER selected: %s\n", info.name);
 	///SDL_SetRenderDrawBlendMode(sdl_renderer, SDL_BLENDMODE_BLEND);
 	
-	SDL_GLContext gl_context = SDL_GL_CreateContext(sdl_window);
-    SDL_GL_MakeCurrent(sdl_window, gl_context);
+	
+	// But needs to be here for CLI
+	if(!IsX11) {
+		gl_context = SDL_GL_CreateContext(sdl_window);
+		SDL_GL_MakeCurrent(sdl_window, gl_context);
+	}
+	
 			
 	/// GUI start
 	ImguiSdlWindow *screen = new ImguiSdlWindow(pathbuf, sdl_window, WinWidth, WinHeight, sdl_renderer, &gl_context);
