@@ -17,7 +17,6 @@
 
 // TO-DOs:
 // aspect ratio for kmsdrm
-// Publish!?
 // multiple hosts.
 // Rumble. Motion Control.
 
@@ -36,7 +35,7 @@ int main()
 	int bufsize = 256;
 	char pathbuf[bufsize];
 	readlink("/proc/self/exe", pathbuf, bufsize);
-	///printf ("Linux Path:  %s\n", pathbuf);
+	printf ("Linux base Path:  %s\n", pathbuf);
 	
 	SDL_version linked;
 	SDL_GetVersion(&linked);
@@ -81,16 +80,33 @@ int main()
 	///SDL_HINT_KMSDRM_REQUIRE_DRM_MASTER
 	///SDL_HINT_AUTO_UPDATE_JOYSTICKS
 	///test for micro stutter - no improvement, RaspiOS tearing issue?
-	///SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
-	///SDL_SetHint(SDL_HINT_VIDEO_DOUBLE_BUFFER, "1");
+	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+	SDL_SetHint(SDL_HINT_VIDEO_DOUBLE_BUFFER, "1");
 	
-	SDL_GLContext gl_context = SDL_GL_CreateContext(sdl_window);
-    SDL_GL_MakeCurrent(sdl_window, gl_context);
     SDL_GL_SetSwapInterval(1); /// Enable vsync, also in gui.cpp
     
 	printf("SDL_VIDEO_DRIVER selected: %s\n",  SDL_GetCurrentVideoDriver());
 
+
+	//~ SDL_Log("Available renderers:\n");
+	//~ int renderer_index = 0;
+	//~ for(int it = 0; it < SDL_GetNumRenderDrivers(); it++) {
+		//~ SDL_RendererInfo info;
+		//~ SDL_GetRenderDriverInfo(it,&info);
+
+		//~ SDL_Log("%s\n", info.name);
+
+		//~ if(strcmp("opengles2", info.name) == 0) {
+			//~ printf("Got hold of GLES2, at %d\n", it);
+			//~ renderer_index = it;
+		//~ }
+	//~ }
+
+
+	// "can't window EGL/GBM surfaces on window creation"
+	// EGL_NO_SURFACE ?
 	SDL_Renderer* sdl_renderer = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+	//SDL_Renderer* sdl_renderer = SDL_CreateRenderer(sdl_window, renderer_index, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
 	if(sdl_renderer==NULL){
 		/// In the event that the window could not be made...
 		printf("Could not create renderer: %s\n", SDL_GetError() );
@@ -102,10 +118,14 @@ int main()
 	SDL_GetRendererInfo( sdl_renderer, &info );
 	printf("SDL_RENDER_DRIVER selected: %s\n", info.name);
 	///SDL_SetRenderDrawBlendMode(sdl_renderer, SDL_BLENDMODE_BLEND);
+	
+	SDL_GLContext gl_context = SDL_GL_CreateContext(sdl_window);
+    SDL_GL_MakeCurrent(sdl_window, gl_context);
 			
 	/// GUI start
 	ImguiSdlWindow *screen = new ImguiSdlWindow(pathbuf, sdl_window, WinWidth, WinHeight, sdl_renderer, &gl_context);
 	screen->start();
+	//while(1) sleep(0.1);
 	
 	/// Finish
 	printf("END chiaki-rpi\n");

@@ -7,19 +7,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W -Wall -Wextra -g -DIMGUI_IMPL_OPENGL_
 
 message("${CMAKE_SOURCE_DIR}")
 
-#/home/pi/dev/chiaki_v4l2/third-party
-
-#find_package(SDL2 MODULE REQUIRED)
 find_package(SDL2 2.0.17 REQUIRED)
 find_package(SDL2IMAGE REQUIRED)
 find_package(SDL2TTF REQUIRED)
 include_directories(${SDL2TTF_INCLUDE_DIR})
 #include_directories(${SDL2_IMAGE_INCLUDE_DIR})
-
-# ./usr/lib/arm-linux-gnueabihf/libyaml-0.so.2
-# apt install libyaml-dev
-
-#include_directories("${FFMPEG_INCLUDE_DIRS}") # needed for correct AV_PIX_FMT_DRM_PRIME==181
 
 find_package(FFMPEG COMPONENTS avcodec avutil avformat REQUIRED)
 message("${FFMPEG_VERSION}")
@@ -57,8 +49,8 @@ add_executable(chiaki-rpi
 				src/settings.cpp
                     src/gui.cpp
                     ${IMGUI_SOURCE_FILES})
-                    
-# ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY} already in chiaki-lib
+
+
 # -lEGS makes it build, but is that the right one or can SDL provide?
 target_link_libraries(chiaki-rpi chiaki-lib ${FFMPEG_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2TTF_LIBRARY} ${SDL2IMAGE_LIBRARY} setsu -ldrm -lGLESv2 -lEGL)
 #find DependInfo.cmake  for clues!

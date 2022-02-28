@@ -14,18 +14,6 @@ tri_option(CHIAKI_ENABLE_SETSU "Enable libsetsu for touchpad input from controll
 #added below
 option(CHIAKI_LIB_ENABLE_OPUS "Use Opus as part of Chiaki Lib" ON)
 
-
-
-#if(CHIAKI_ENABLE_GUI OR CHIAKI_ENABLE_BOREALIS)
-#	set(CHIAKI_FFMPEG_DEFAULT ON)
-#else()
-#	set(CHIAKI_FFMPEG_DEFAULT AUTO)
-#endif()
-#tri_option(CHIAKI_ENABLE_FFMPEG_DECODER "Enable FFMPEG video decoder" ${CHIAKI_FFMPEG_DEFAULT})
-#option(CHIAKI_ENABLE_FFMPEG_DECODER ON)
-
-#tri_option(CHIAKI_ENABLE_PI_DECODER "Enable Raspberry Pi-specific video decoder (requires libraspberrypi0 and libraspberrypi-doc)" AUTO)
-#option(CHIAKI_ENABLE_PI_DECODER OFF)
 option(CHIAKI_LIB_ENABLE_MBEDTLS "Use mbedtls instead of OpenSSL as part of Chiaki Lib" OFF)
 option(CHIAKI_LIB_OPENSSL_EXTERNAL_PROJECT "Use OpenSSL as CMake external project" OFF)
 option(CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER "Use SDL Gamecontroller for Input" ON)
@@ -38,7 +26,7 @@ set(CHIAKI_VERSION_MINOR 1)
 set(CHIAKI_VERSION_PATCH 1)
 set(CHIAKI_VERSION ${CHIAKI_VERSION_MAJOR}.${CHIAKI_VERSION_MINOR}.${CHIAKI_VERSION_PATCH})
 
-set(CPACK_PACKAGE_NAME "chiaki")
+set(CPACK_PACKAGE_NAME "chiaki-rpi")
 set(CPACK_PACKAGE_DESCRIPTION "Open Source PS4|PS5 remote play client")
 set(CPACK_PACKAGE_VERSION_MAJOR ${CHIAKI_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${CHIAKI_VERSION_MINOR})
