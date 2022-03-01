@@ -561,6 +561,7 @@ void ImguiSdlWindow::CreateImguiWidgets()
 						{
 							hostClick();
 						}
+						ImGui::Text(client_state.c_str());
 					ImGui::EndChild();
 
 
