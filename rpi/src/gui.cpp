@@ -230,8 +230,6 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	io->Init(host);
 	host->Init(io);
 	io->InitGamepads();
-	
-
 	settings = new RpiSettings();
 	settings->ReadYaml();  /// before starting discovery service
 	
@@ -972,11 +970,11 @@ void ImguiSdlWindow::setClientState(std::string state)
 {	
 	/// host: unknown, standby, ready					 		 (this is host 'state')
 	/// gui:  unknown, notreg, standby, waiting, ready, playing   (this is 'client_state')
-	///printf("State now:  %s\n", state.c_str());
+	/// printf("ImguiSdlWindow::setClientState now:  %s\n", state.c_str());
 	
 	client_state = state;
 	
-	if(state == "unknown")	SwitchHostImage(0);
+	if(state == "unknown" || state == "notreg")	SwitchHostImage(0);
 	else {
 		if(settings->all_read_settings.at(0).isPS5 == "1")
 		{
