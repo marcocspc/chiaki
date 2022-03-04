@@ -500,8 +500,14 @@ bool ImguiSdlWindow::start()
 			CreateImguiWidgets();
 
 		/// GL render
-		if(guiActive || IsX11)
+		if(guiActive || IsX11) {
 			RefreshScreenDraw();
+		} else if(clear_counter < 2) {
+			/// flushed out the last gui frame from kmsdrm framebuffer for black bg
+			RefreshScreenDraw();
+			clear_counter++;
+		}
+		
 	}
 	
 	return true;
@@ -1014,6 +1020,7 @@ void ImguiSdlWindow::restoreGui()
 	guiActive = 1;
 	host->StartDiscoveryService();  /// Did I ever stop it?
 	io->SwitchInputReceiver(std::string("gui"));
+	clear_counter = 0;
 }
 
 /// Needs to trigger in session

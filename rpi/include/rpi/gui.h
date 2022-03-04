@@ -66,7 +66,7 @@ struct SDL_SysWMinfo
 	SDL_SYSWM_TYPE subsystem;
 	union
 	{
-		
+
 //#if defined(SDL_VIDEO_DRIVER_X11)
         struct
         {
@@ -74,7 +74,7 @@ struct SDL_SysWMinfo
             Window window;              /**< The X11 window */
         } x11;
 //#endif
-		
+
 //#if defined(SDL_VIDEO_DRIVER_KMSDRM)
 		struct
 		{
@@ -163,6 +163,7 @@ class ImguiSdlWindow
 		SDL_Renderer *sdl_renderer = nullptr;
 		bool IsX11 = false;
 		bool takeInput=1;
+		int clear_counter = 0;
 		
 		
 		/// textures for gui
