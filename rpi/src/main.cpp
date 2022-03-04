@@ -12,11 +12,8 @@
 #define HOSTS_MAX	4		// was 16
 #define DROP_PINGS	3
 
-#define WinWidth 1280
-#define WinHeight 720
 
 // TO-DOs:
-// aspect ratio for kmsdrm
 // multiple hosts.
 // Rumble. Motion Control.
 
@@ -52,15 +49,31 @@ int main()
 	///SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);//test
 	
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
-
+	
+	int screen_width = 1920;
+	int screen_height = 1080;
+	
+	/// Seems Mode 0 is the best one in my case.
+	/// More here:  https://wiki.libsdl.org/CategoryVideo
+	/// First one X11:   INFO: Mode 0	bpp 24	SDL_PIXELFORMAT_RGB888		1920 x 1200
+	/// First one CLI:   INFO: Mode 0	bpp 32	SDL_PIXELFORMAT_ARGB8888	1920 x 1200
+	SDL_DisplayMode sdl_top_mode;
+	///if( SDL_GetDisplayMode(int displayIndex, int modeIndex, SDL_DisplayMode * mode) == 0)
+	if( SDL_GetDisplayMode(0, 0, &sdl_top_mode) == 0)  /// success
+	{
+		screen_width = sdl_top_mode.w;
+		screen_height = sdl_top_mode.h;
+		printf("  Disp Mode: \t%dx%dpx @ %dhz \n", sdl_top_mode.w, sdl_top_mode.h, sdl_top_mode.refresh_rate);
+	}
+	
     /// Create an application window with the following settings:
     SDL_Window *sdl_window;
 	sdl_window = SDL_CreateWindow(
 		"Chiaki",         			///    const char* title
 		SDL_WINDOWPOS_UNDEFINED,  	///    int x: initial x position
 		SDL_WINDOWPOS_UNDEFINED,  	///    int y: initial y position
-		WinWidth,                   ///    int w: width, in pixels
-		WinHeight,                  ///    int h: height, in pixels
+		screen_width,                   ///    int w: width, in pixels
+		screen_height,                  ///    int h: height, in pixels
 		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
 	);
 	
@@ -70,6 +83,9 @@ int main()
       SDL_Quit();
       return 1;
     }
+    
+    SDL_SetWindowDisplayMode(sdl_window, &sdl_top_mode);
+    
     
     SDL_GLContext gl_context;
     
@@ -109,16 +125,13 @@ int main()
 		//~ }
 	//~ }
 	
-	// Having this here makes wokrk ok in X11
+	/// Having this here makes work ok in X11...
 	if(IsX11) {
 		gl_context = SDL_GL_CreateContext(sdl_window);
 		SDL_GL_MakeCurrent(sdl_window, gl_context);
 	}
 
-	// "can't window EGL/GBM surfaces on window creation"
-	// EGL_NO_SURFACE ?
 	SDL_Renderer* sdl_renderer = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-	//SDL_Renderer* sdl_renderer = SDL_CreateRenderer(sdl_window, renderer_index, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
 	if(sdl_renderer==NULL){
 		/// In the event that the window could not be made...
 		printf("Could not create renderer: %s\n", SDL_GetError() );
@@ -132,7 +145,7 @@ int main()
 	///SDL_SetRenderDrawBlendMode(sdl_renderer, SDL_BLENDMODE_BLEND);
 	
 	
-	// But needs to be here for CLI
+	/// ...but needs to be here for CLI
 	if(!IsX11) {
 		gl_context = SDL_GL_CreateContext(sdl_window);
 		SDL_GL_MakeCurrent(sdl_window, gl_context);
@@ -140,7 +153,7 @@ int main()
 	
 			
 	/// GUI start
-	ImguiSdlWindow *screen = new ImguiSdlWindow(pathbuf, sdl_window, WinWidth, WinHeight, sdl_renderer, &gl_context);
+	ImguiSdlWindow *screen = new ImguiSdlWindow(pathbuf, sdl_window, screen_width, screen_height, sdl_renderer, &gl_context);
 	screen->start();
 	//while(1) sleep(0.1);
 	

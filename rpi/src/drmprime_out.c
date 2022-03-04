@@ -262,12 +262,38 @@ static int do_display(drmprime_out_env_t *const de, AVFrame *frame)
             return -1;
         }
     }
+    
+    // Aspect ratio fitting (should feed this from elsewhere instead of calc per frame)
+    int vp_width = 64;
+	int vp_height = 48;
+	int vp_xoffs = 0;
+	int vp_yoffs = 0;
+	float aspect = 1280.0 / 720.0;   /// Assuming always 1.77777
+    int w = de->setup.compose.width; /// monitor w
+    int h = de->setup.compose.height;/// monitor h
+    //printf("W: %d    H: %d\n", w,h);
+	
+	if(aspect < w/h)  /// landscape
+	{
+		vp_width = (int)(h * aspect);
+		vp_height = h;
+		vp_xoffs = (w - vp_width)/2;
+	}
+	else   /// portrait
+	{
+		vp_width = w;
+		vp_height = (int)(w / aspect);
+		vp_yoffs = (h - vp_height)/2;
+	}
 
     ret = drmModeSetPlane(de->drm_fd, de->setup.planeId, de->setup.crtcId,
                           da->fb_handle, 0,
-                          de->setup.compose.x, de->setup.compose.y,
-                          de->setup.compose.width,
-                          de->setup.compose.height,
+                          de->setup.compose.x + vp_xoffs,
+                          de->setup.compose.y + vp_yoffs,
+                          ///de->setup.compose.width,
+                          vp_width,
+                          ///de->setup.compose.height,
+                          vp_height,
                           0, 0,
                           av_frame_cropped_width(frame) << 16,
                           av_frame_cropped_height(frame) << 16);
