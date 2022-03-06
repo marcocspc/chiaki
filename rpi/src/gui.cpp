@@ -316,21 +316,26 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	imret = LoadTextureFromFile(tx3.c_str(), &gui_textures[3], &my_image_width, &my_image_height);
 	IM_ASSERT(imret);
 
-	std::string tx4 = mainpath + "ps5_orange_01.png";
+	std::string tx4 = mainpath + "ps5_01.png";
 	imret = LoadTextureFromFile(tx4.c_str(), &gui_textures[4], &my_image_width, &my_image_height);
 	IM_ASSERT(imret);
-	
-	std::string tx5 = mainpath + "ps5_blue_01.png";
+
+	std::string tx5 = mainpath + "ps5_orange_01.png";
 	imret = LoadTextureFromFile(tx5.c_str(), &gui_textures[5], &my_image_width, &my_image_height);
 	IM_ASSERT(imret);
 	
+	std::string tx6 = mainpath + "ps5_blue_01.png";
+	imret = LoadTextureFromFile(tx6.c_str(), &gui_textures[6], &my_image_width, &my_image_height);
+	IM_ASSERT(imret);
+		
+	
 	SwitchHostImage(0); /// to 'unknown' as default start
 	
-	std::string tx6 = mainpath + "logo_01.png";
-	LoadTextureFromFile(tx6.c_str(), &logo_texture, &logo_width, &logo_height);
+	std::string tx7 = mainpath + "logo_01.png";
+	LoadTextureFromFile(tx7.c_str(), &logo_texture, &logo_width, &logo_height);
 	IM_ASSERT(imret);
-	logo_width = 541;
-	logo_height = 124;
+	///logo_width = 541;
+	///logo_height = 124;
 	
 
 	printf("Gui init done\n");
