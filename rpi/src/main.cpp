@@ -14,10 +14,10 @@
 
 
 // TO-DOs:
-// multiple hosts.
 // Rumble. Motion Control.
+// multiple hosts.
 
-///#include "gperftools/profiler.h"
+/// #include "gperftools/profiler.h"
 /// export CPUPROFILE_FREQUENCY=50
 /// env CPUPROFILE=out.prof rpi/chiaki-rpi
 /// > google-pprof --text rpi/chiaki-rpi out.prof
@@ -25,9 +25,9 @@
 
 int main()
 {
-	//ChiakiLog log;
-	//chiaki_log_init(&log, 4, NULL, NULL);  // 1 is the log level, 4 also good, try 14
-	//chiaki_log_init(&log, CHIAKI_LOG_ALL & ~CHIAKI_LOG_VERBOSE, NULL, NULL);
+	///ChiakiLog log;
+	///chiaki_log_init(&log, 4, NULL, NULL);  // 1 is the log level, 4 also good, try 14
+	///chiaki_log_init(&log, CHIAKI_LOG_ALL & ~CHIAKI_LOG_VERBOSE, NULL, NULL);
 	
 	int bufsize = 256;
 	char pathbuf[bufsize];
@@ -44,8 +44,8 @@ int main()
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);//0,1 use 0
 	SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);//try 0
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);// try 0
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);//was: 24, try 0
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);//was: 8, try 0
 	///SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);//test
 	
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
@@ -95,7 +95,7 @@ int main()
 	else IsX11 = false;
     
 	SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1"); /// Seems to work!
-	SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "1"); // NEW Testing, 0=glx, "By default SDL will use GLX when both are present."
+	SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "1"); // 0=glx, "By default SDL will use GLX when both are present."
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2"); /// Seems to work and be enough!
 	
 	///SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR
