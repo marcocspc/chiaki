@@ -181,6 +181,14 @@ void IO::HandleJoyEvent(void)
 				case SDL_QUIT:
 					exit(0);
 					break;
+				
+				case SDL_KEYDOWN:
+				{
+					case SDLK_F11:
+						host->gui->ToggleFullscreen();
+						break;
+				}
+					
 				case SDL_CONTROLLERBUTTONUP:
 					controller_state = GetState();
 					break;

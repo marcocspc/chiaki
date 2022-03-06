@@ -127,6 +127,7 @@ class ImguiSdlWindow
 		void ChangeSettingAction(int widgetID, std::string choice);
 		void SwitchHelpText(const char* label);
 		void HandleSDLEvents();
+		void ToggleFullscreen();
 		
 		/// Imgui things
 		void SettingsDraw(int widgetID, const char* label, std::vector<std::string> list, std::string &select);

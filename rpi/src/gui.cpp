@@ -1004,17 +1004,6 @@ void ImguiSdlWindow::setClientState(std::string state)
 	
 }
 
-
-//~ bool ImguiSdlWindow::keyboardEvent(int key, int scancode, int action, int modifiers)
-//~ {
-	//~ //printf("Key press\n");	
-
-	//~ //performLayout(mSDL_Renderer);
-
-	//~ return false;
-//~ }
-
-
 void ImguiSdlWindow::restoreGui()
 {	
 	io->FiniFFmpeg();
@@ -1026,6 +1015,19 @@ void ImguiSdlWindow::restoreGui()
 	host->StartDiscoveryService();  /// Did I ever stop it?
 	io->SwitchInputReceiver(std::string("gui"));
 	clear_counter = 0;
+}
+
+void ImguiSdlWindow::ToggleFullscreen()
+{
+	fullscreen = !fullscreen;
+	if (fullscreen)
+	{
+	  SDL_SetWindowFullscreen(sdl_window, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
+	}
+	else
+	{
+	  SDL_SetWindowFullscreen(sdl_window, SDL_WINDOW_OPENGL);
+	}
 }
 
 /// Needs to trigger in session
@@ -1071,8 +1073,3 @@ bool ImguiSdlWindow::resizeEvent(int w, int h)
 	
 	return true;
 }
-
-//~ void ImguiSdlWindow::mouseClickEvent()
-//~ {
-	//~ printf("mouseClickEvent\n");
-//~ }
