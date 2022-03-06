@@ -50,8 +50,13 @@ int main()
 	
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 	
-	int screen_width = 1920;
-	int screen_height = 1080;
+	int screen_width = 1280;
+	int screen_height = 720;
+	
+	bool IsX11 = true;
+    if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0)///0 is match
+		 IsX11 = true;
+	else IsX11 = false;
 	
 	/// Seems Mode 0 is the best one in my case.
 	/// More here:  https://wiki.libsdl.org/CategoryVideo
@@ -60,9 +65,12 @@ int main()
 	SDL_DisplayMode sdl_top_mode;
 	///if( SDL_GetDisplayMode(int displayIndex, int modeIndex, SDL_DisplayMode * mode) == 0)
 	if( SDL_GetDisplayMode(0, 0, &sdl_top_mode) == 0)  /// success
-	{
-		screen_width = sdl_top_mode.w;
-		screen_height = sdl_top_mode.h;
+	{	
+		if(!IsX11) {
+			screen_width = sdl_top_mode.w;
+			screen_height = sdl_top_mode.h;
+		}
+		
 		printf("  Disp Mode: \t%dx%dpx @ %dhz \n", sdl_top_mode.w, sdl_top_mode.h, sdl_top_mode.refresh_rate);
 	}
 	
@@ -76,24 +84,18 @@ int main()
 		screen_height,                  ///    int h: height, in pixels
 		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
 	);
-	
+
 	/// Check that the window was successfully made
     if(sdl_window==NULL){
       std::cout << "SDL Could not create window: " << SDL_GetError() << '\n';
       SDL_Quit();
       return 1;
     }
-    
+
+    /// Affects fullscreen toggle under X11
     SDL_SetWindowDisplayMode(sdl_window, &sdl_top_mode);
-    
-    
-    SDL_GLContext gl_context;
-    
-    bool IsX11 = true;
-    if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0)///0 is match
-		 IsX11 = true;
-	else IsX11 = false;
-    
+
+    SDL_GLContext gl_context;    
 	SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1"); /// Seems to work!
 	SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "1"); // 0=glx, "By default SDL will use GLX when both are present."
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2"); /// Seems to work and be enough!
