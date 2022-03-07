@@ -30,7 +30,7 @@ int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
 /// The text blurbs for the info panel.
 const char* ChiakiGetHelpText(int n)
 {
-	const char* text = "\nWelcome to Chiaki!";
+	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n\nR3 + Circle = Quit Play Session";
 	if(n==1)
 		text = "VIDEO DECODER:\n\nThe software that decodes the video stream. The actual decode happens on the Pi's hardware but this decides which API to use.\n\nCurrently only v4l2 is available and this is used through ffmpeg";
 	if(n==2)
@@ -990,8 +990,9 @@ void ImguiSdlWindow::setClientState(std::string state)
 	else {
 		if(settings->all_read_settings.at(0).isPS5 == "1")
 		{
-			if(state == "standby")	SwitchHostImage(4);
-			if(state == "ready")	SwitchHostImage(5);
+			if(state == "standby")	SwitchHostImage(5);
+			if(state == "waiting")	SwitchHostImage(4);
+			if(state == "ready")	SwitchHostImage(6);
 		}
 			
 		if(settings->all_read_settings.at(0).isPS5 == "0")
