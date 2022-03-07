@@ -261,6 +261,12 @@ void Host::RegistStart(std::string accountID, std::string pin)
 	accId_len =  settings.GetB64encodeSize(accountID.length());
 	
 	printf("AccID entered:  %s\n", accountID.c_str());
+	
+	/// Need to strip any trailing '=' signs
+	if(accountID.back() == '=')
+		accountID = accountID.substr(0, accountID.size()-1);
+	
+	///printf("NEW: %s\n", accountID.c_str());
 
 	ChiakiErrorCode err = chiaki_base64_decode(
 			accountID.c_str(), accountID.length(),
