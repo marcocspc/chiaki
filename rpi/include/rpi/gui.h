@@ -162,6 +162,9 @@ class ImguiSdlWindow
 		SDL_GLContext *gl_ctx;
 		SDL_Window *sdl_window = nullptr; 
 		SDL_Renderer *sdl_renderer = nullptr;
+		EGLDisplay egl_display;
+		bool planes_init_done = false;
+		EGLint attribs[50];
 		bool IsX11 = false;
 		bool takeInput=1;
 		int clear_counter = 0;

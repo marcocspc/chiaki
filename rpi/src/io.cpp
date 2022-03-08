@@ -541,11 +541,11 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 	av_frame_free(&frame);
 	
     while (1) {
-        if (!(frame = av_frame_alloc())) { //can this be removed with queue?
-            fprintf(stderr, "Can not alloc frame\n");
-            ret = AVERROR(ENOMEM);
-            goto the_end;
-        }
+        //~ if (!(frame = av_frame_alloc())) { //can this be removed with queue?
+            //~ fprintf(stderr, "Can not alloc frame\n");
+            //~ ret = AVERROR(ENOMEM);
+            //~ goto the_end;
+        //~ }
         
         frame = frames_list.GetNextFreed();/// get empty frame pointer, allocated
 		ret = avcodec_receive_frame(codec_context, frame); //ret 0 ==success

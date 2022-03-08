@@ -836,6 +836,14 @@ int ImguiSdlWindow::InitVideoGl()
 	glGenTextures(1, &texture);
 	glUseProgram(program);
 	///glGetUniformLocation(program, "texture");
+	
+	SDL_SysWMinfo WMinfo;
+	SDL_VERSION(&WMinfo.version);
+	SDL_GetWindowWMInfo(sdl_window, &WMinfo);
+	EGLNativeDisplayType hwnd = WMinfo.info.x11.display;  /// WMinfo.info.kmsdrm.drm_fd, WMinfo.info.x11.display
+	egl_display = eglGetDisplay(hwnd);
+	
+	
 
 	return 1;
 }
@@ -853,52 +861,53 @@ bool ImguiSdlWindow::UpdateAVFrame()
 		printf("UpdateFromGUI: Not a AV_PIX_FMT_DRM_PRIME AVFrame, %d\n", frame->format);
 		return false;
 	}
+	
+	
+	// TRY do only on first frame - but needs valid frame->data
+	if(!planes_init_done)
+	{
+		const AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
+		//~ EGLint attribs[50];
+		EGLint *a = attribs;
+		const EGLint *b = texgen_attrs;
+		
+		*a++ = EGL_WIDTH;
+		*a++ = av_frame_cropped_width(frame);
+		*a++ = EGL_HEIGHT;
+		*a++ = av_frame_cropped_height(frame);
+		*a++ = EGL_LINUX_DRM_FOURCC_EXT;
+		*a++ = desc->layers[0].format;
+		
+		int i, j;
+		for (i = 0; i < desc->nb_layers; ++i) {
+				for (j = 0; j < desc->layers[i].nb_planes; ++j) {
+					const AVDRMPlaneDescriptor * const p = desc->layers[i].planes + j;
+					const AVDRMObjectDescriptor * const obj = desc->objects + p->object_index;
+					*a++ = *b++;
+					*a++ = obj->fd;
+					*a++ = *b++;
+					*a++ = p->offset;
+					*a++ = *b++;
+					*a++ = p->pitch;
+					if (obj->format_modifier == 0) {
+					   b += 2;
+					}
+					else {
+					   *a++ = *b++;
+					   *a++ = (EGLint)(obj->format_modifier & 0xFFFFFFFF);
+					   *a++ = *b++;
+					   *a++ = (EGLint)(obj->format_modifier >> 32);
+					}
+				}
+		 }
+		
+		 *a = EGL_NONE;
+		 
+		 planes_init_done = true;
+	 }
+	
+	
 
-	const AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
-
-	EGLint attribs[50];
-	EGLint *a = attribs;
-	const EGLint *b = texgen_attrs;
-	
-	*a++ = EGL_WIDTH;
-	*a++ = av_frame_cropped_width(frame);
-	*a++ = EGL_HEIGHT;
-	*a++ = av_frame_cropped_height(frame);
-	*a++ = EGL_LINUX_DRM_FOURCC_EXT;
-	*a++ = desc->layers[0].format;
-	
-	int i, j;
-	for (i = 0; i < desc->nb_layers; ++i) {
-            for (j = 0; j < desc->layers[i].nb_planes; ++j) {
-                const AVDRMPlaneDescriptor * const p = desc->layers[i].planes + j;
-                const AVDRMObjectDescriptor * const obj = desc->objects + p->object_index;
-                *a++ = *b++;
-                *a++ = obj->fd;
-                *a++ = *b++;
-                *a++ = p->offset;
-                *a++ = *b++;
-                *a++ = p->pitch;
-                if (obj->format_modifier == 0) {
-                   b += 2;
-                }
-                else {
-                   *a++ = *b++;
-                   *a++ = (EGLint)(obj->format_modifier & 0xFFFFFFFF);
-                   *a++ = *b++;
-                   *a++ = (EGLint)(obj->format_modifier >> 32);
-                }
-            }
-     }
-	
-	 *a = EGL_NONE;
-	
-	
-	// this can be done not on every frame
-	SDL_SysWMinfo WMinfo;
-	SDL_VERSION(&WMinfo.version);
-	SDL_GetWindowWMInfo(sdl_window, &WMinfo);
-	EGLNativeDisplayType hwnd = WMinfo.info.x11.display;  /// WMinfo.info.kmsdrm.drm_fd, WMinfo.info.x11.display
-	EGLDisplay egl_display = eglGetDisplay(hwnd);
 	
 	const EGLImage image = eglCreateImageKHR( egl_display,
                                               EGL_NO_CONTEXT,
@@ -911,7 +920,6 @@ bool ImguiSdlWindow::UpdateAVFrame()
 
 	glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
 	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, nullptr);
-	new_texture = texture;
 		
 	return true;
 }
@@ -1016,6 +1024,7 @@ void ImguiSdlWindow::restoreGui()
 	host->StartDiscoveryService();  /// Did I ever stop it?
 	io->SwitchInputReceiver(std::string("gui"));
 	clear_counter = 0;
+	planes_init_done = false;
 }
 
 void ImguiSdlWindow::ToggleFullscreen()
