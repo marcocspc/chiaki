@@ -30,7 +30,7 @@ int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
 /// The text blurbs for the info panel.
 const char* ChiakiGetHelpText(int n)
 {
-	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n\nR3 + Circle = Quit Play Session";
+	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n  R3 + Circle = Quit Play Session\n\nHotkeys:\n  F11 = Toggle Fullscreen";
 	if(n==1)
 		text = "VIDEO DECODER:\n\nThe software that decodes the video stream. The actual decode happens on the Pi's hardware but this decides which API to use.\n\nCurrently only v4l2 is available and this is used through ffmpeg";
 	if(n==2)
@@ -481,6 +481,7 @@ refresh:
 
 /// This is the GUI main loop
 ///
+// Need to fix this weirdo logic overlap with session.
 bool ImguiSdlWindow::start()
 {	
 	ImGuiStyle &style = ImGui::GetStyle();
@@ -492,14 +493,23 @@ bool ImguiSdlWindow::start()
 	// Main loop
 	while (!done)
 	{	
-		/// maybe generate fresh frame texture for GL
-		if(io->nextFrameCount > prevFrameCount && !guiActive){
-			frame = io->frames_list.GetCurrentFrame();
-			UpdateAVFrame();
-			prevFrameCount = io->nextFrameCount;
+		
+		bool got_frame = false;
+		while(!got_frame && !guiActive)
+		{	
+			usleep(2000);  /// 2000 should be 2ms
+			/// maybe generate fresh frame texture for GL
+			if(io->nextFrameCount > prevFrameCount && !guiActive){
+				frame = io->frames_list.GetCurrentFrame();
+				UpdateAVFrame();
+				prevFrameCount = io->nextFrameCount;
+				got_frame = true;
+			}
 		}
-
-		HandleSDLEvents();
+		
+		
+		if(guiActive)
+			HandleSDLEvents();
 
 		if(guiActive)
 			CreateImguiWidgets();
