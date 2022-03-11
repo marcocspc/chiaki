@@ -864,8 +864,8 @@ bool ImguiSdlWindow::UpdateAVFrame()
 	
 	
 	// TRY do only on first frame - but needs valid frame->data
-	if(!planes_init_done)
-	{
+	//if(!planes_init_done)
+	//{
 		const AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
 		//~ EGLint attribs[50];
 		EGLint *a = attribs;
@@ -903,8 +903,8 @@ bool ImguiSdlWindow::UpdateAVFrame()
 		
 		 *a = EGL_NONE;
 		 
-		 planes_init_done = true;
-	 }
+		 //planes_init_done = true;
+	 //}
 	
 	
 
