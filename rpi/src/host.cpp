@@ -98,8 +98,8 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 	host->state = chiaki_discovery_host_state_string(discovered_hosts->state);
 	printf("Discovered Host State:  %s\n", host->state.c_str());
 
-	bool ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(discovered_hosts));
-	printf("Is PS5:  %d\n", ps5);
+	host->ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(discovered_hosts));
+	printf("Is PS5:  %d\n", host->ps5);
 
 	/// If read settings are empty (so nothing was read from file earlier)
 	/// [N]

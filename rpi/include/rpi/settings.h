@@ -7,10 +7,10 @@
 #include <vector>
 #include <algorithm>	/// remove_if()
 #include <cstring>
+#include <sys/stat.h>	/// check/make dir
 
 #include <sstream>		/// stringstream
 #include <iomanip>		/// std::hex
-//#include <bitset>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -18,15 +18,6 @@
 
 #include <chiaki/base64.h>
 #include <chiaki/session.h>
-
-//~ using std::cout;
-//~ using std::endl;
-//~ using std::ofstream;
-//~ using std::fstream;
-//~ using std::string;
-//~ using std::vector;
-//~ using std::array;
-
 
 std::string GetValueForToken(std::string line, std::string token);
 //std::vector<char> KeyStr2ByteArray(std::string in_str);
@@ -66,12 +57,9 @@ class RpiSettings
 		ChiakiCodec GetChiakiCodec(std::string choice);
 		ChiakiVideoResolutionPreset GetChiakiResolution(std::string choice);
 		ChiakiVideoFPSPreset GetChiakiFps(std::string choice);
-	
-	
-	private:
-	
-	
-};
 
+	private:
+
+};
 
 #endif

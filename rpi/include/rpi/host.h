@@ -49,6 +49,7 @@ class Host
 		std::string state = "";  /// standby, unknown, ready etc
 		ChiakiDiscoveryService *service;
 		ChiakiDiscoveryHost *discoveredHosts = nullptr;
+		bool ps5 = false;	/// set by Discovery, not config read (overwrite if Config exists?)
 
 		ChiakiThread play_th;
 		

@@ -1002,18 +1002,30 @@ void ImguiSdlWindow::setClientState(std::string state)
 	/// gui:  unknown, notreg, standby, waiting, ready, playing   (this is 'client_state')
 	/// printf("ImguiSdlWindow::setClientState now:  %s\n", state.c_str());
 	
-	client_state = state;
+	if(state.empty())
+		client_state = std::string("unknown");
+	else
+		client_state = state;
 	
-	if(state == "unknown" || state == "notreg")	SwitchHostImage(0);
-	else {
-		if(settings->all_read_settings.at(0).isPS5 == "1")
+	
+	if(state == "unknown" || state == "notreg") {
+		SwitchHostImage(0);
+	} else {
+		
+		bool settings_ps5 = false;
+		if(settings->all_read_settings.size() > 0) {
+			if(settings->all_read_settings.at(0).isPS5 == "1")
+				settings_ps5 = true;
+		}
+
+		if(settings_ps5 || host->ps5) // ouch we should not have two different ones. Needs merging
 		{
 			if(state == "standby")	SwitchHostImage(5);
 			if(state == "waiting")	SwitchHostImage(4);
 			if(state == "ready")	SwitchHostImage(6);
 		}
-			
-		if(settings->all_read_settings.at(0).isPS5 == "0")
+
+		if(!settings_ps5 || !host->ps5)
 		{
 			if(state == "standby")	SwitchHostImage(2);
 			if(state == "waiting")	SwitchHostImage(1);

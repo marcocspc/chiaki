@@ -309,10 +309,20 @@ void RpiSettings::ReadYaml()
 /// not using actual libyaml to write. Seemed too complicated.
 /// re-writing the full file at once from current settings in memory.
 void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
-{
+{	
+	int ret;
 	std::string filename("/home/");
 	filename.append(getenv("USER"));
-	filename.append("/.config/Chiaki/Chiaki_rpi.conf");
+
+	/// check if directories exist, if not - create it
+	filename.append("/.config/Chiaki");
+	struct stat sb;
+	if ( (stat(filename.c_str(), &sb) != 0) || !S_ISDIR(sb.st_mode)) {
+		ret = mkdir(filename.c_str(), 0777);
+        if(ret)  printf("Error creating .config/Chiaki directory\n");
+    }
+
+	filename.append("/Chiaki_rpi.conf");
 		
 	ofstream out(filename);
 	if (!out.is_open()) {
