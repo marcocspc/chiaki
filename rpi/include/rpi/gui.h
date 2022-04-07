@@ -149,6 +149,7 @@ class ImguiSdlWindow
 		ImVec4  info_col = ImColor(5, 5, 5, 128);
 		///ImColor neon_yell = ImColor(200, 255, 0, 255);
 		ImFont* imgui_font;
+		ImFont* regist_font;
 		int help_text_n = 0;
 		int psBtnSz = 256;
 		int dspszX = 0;

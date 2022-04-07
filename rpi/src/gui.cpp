@@ -295,7 +295,8 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 
 	ImGuiIO &imio = ImGui::GetIO();
 	float size_pixels = 18;
-	imgui_font = imio.Fonts->AddFontFromFileTTF(strcat((char*)mainpath.c_str(), "komika.slick.ttf"), size_pixels);
+	imgui_font = imio.Fonts->AddFontFromFileTTF(std::string(mainpath+"komika.slick.ttf").c_str(), size_pixels);
+	regist_font = imio.Fonts->AddFontFromFileTTF(std::string(mainpath+"Cousine-Regular.ttf").c_str(), size_pixels);
 
 	/// Textures for buttons, bg etc
 	int my_image_width = 0;
@@ -614,13 +615,17 @@ void ImguiSdlWindow::CreateImguiWidgets()
 						ImGui::Text("Add Register info from your Playstation\n\n");
 						ImGui::Text(" ");
 						
+						ImGui::PushFont(regist_font);
 						ImGui::InputText(" Account Id", c_regist_acc_id, IM_ARRAYSIZE(c_regist_acc_id));
 						ImGui::Text(" ");
+						ImGui::PopFont();
 						
+						ImGui::PushFont(regist_font);
 						ImGui::InputText(" Pin", c_regist_pin, IM_ARRAYSIZE(c_regist_pin));
 						ImGui::Text(" ");
+						ImGui::PopFont();
 
-						if (ImGui::Button("Send", ImVec2(120, 0))) {
+						if (ImGui::Button("Register", ImVec2(120, 0))) {
 							
 							std::string acc_id(c_regist_acc_id);
 							std::string pin(c_regist_pin);
