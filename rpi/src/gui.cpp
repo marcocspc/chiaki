@@ -30,7 +30,7 @@ int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
 /// The text blurbs for the info panel.
 const char* ChiakiGetHelpText(int n)
 {
-	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n  R3 + Circle = Quit Play Session\nR3+Square = Screen grab\n\nHotkeys:\n  F11 = Toggle Fullscreen";
+	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n  R3 + Circle = Quit Play Session\n  R3+Square = Screen grab\n\nHotkeys:\n  F11 = Toggle Fullscreen";
 	if(n==1)
 		text = "VIDEO DECODER:\n\nThe software that decodes the video stream. The actual decode happens on the Pi's hardware but this decides which API to use.\n\nCurrently only v4l2 is available and this is used through ffmpeg";
 	if(n==2)
