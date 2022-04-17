@@ -13,7 +13,7 @@ find_package(SDL2TTF REQUIRED)
 include_directories(${SDL2TTF_INCLUDE_DIR})
 #include_directories(${SDL2_IMAGE_INCLUDE_DIR})
 
-find_package(FFMPEG COMPONENTS avcodec avutil avformat REQUIRED)
+find_package(FFMPEG COMPONENTS avcodec avutil avformat swscale REQUIRED)
 message("${FFMPEG_VERSION}")
 message("${FFMPEG_INCLUDE_DIRS}")
 message("${FFMPEG_LIBRARIES}")

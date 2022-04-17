@@ -1,13 +1,8 @@
 #include <rpi/io.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "rpi/stb_image_write.h"
 
 #define SETSU_UPDATE_INTERVAL_MS 4
-
-/// Gamepad special input actions:
-///
-/// R3+Circle to quit
-///
-///
-
 
 AVFramesList::AVFramesList()
 {
@@ -270,16 +265,28 @@ ChiakiControllerState IO::GetState()
 void IO::SpecialControlHandler()
 {
 	///printf("SpecialControlHandler()\n");
-	
+
 	/// R3+Moon/Circle to Quit session
-	ChiakiControllerState kill_combo;  // can be set in Init or create.
+	ChiakiControllerState kill_combo;
 	chiaki_controller_state_set_idle(&kill_combo);
 	kill_combo.buttons |= CHIAKI_CONTROLLER_BUTTON_R3;
 	kill_combo.buttons |= CHIAKI_CONTROLLER_BUTTON_MOON;
+	
+	/// R3+Box/Square to take screen grab
+	ChiakiControllerState screengrab_combo;
+	chiaki_controller_state_set_idle(&screengrab_combo);
+	screengrab_combo.buttons |= CHIAKI_CONTROLLER_BUTTON_R3;
+	screengrab_combo.buttons |= CHIAKI_CONTROLLER_BUTTON_BOX;
+	
 	if(controller_state.buttons == kill_combo.buttons) {
 		///printf("Kill Session - Restore Gui\n");
 		chiaki_session_stop(&this->host->session);
 		host->gui->restoreGui();
+		return;
+	}
+	if(controller_state.buttons == screengrab_combo.buttons) {
+		ScreenGrab();
+		return;
 	}
 	
 	
@@ -513,12 +520,7 @@ int IO::FiniFFmpeg()
 /// For kmsdrm render and gl render
 bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 {	
-	//printf("In VideoCB\n");
-	/// for frame dumps only
-	size_t size;
-	AVFrame *sw_frame = nullptr;
-	uint8_t *buffer = NULL;
-
+	//printf("In VideoCB\n");	
 	AVPacket packet;
 	av_init_packet(&packet); // Deprecated2021 NEW->  AVPacket* packet = av_packet_alloc();
 	packet.data = buf;
@@ -570,73 +572,68 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 			fprintf(stderr, "Error while decoding\n");
 		}
 
-	
-	
-	/// This is just a debug section to write out raw rgb frame
-	if(0)
-	{
-		sw_frame = av_frame_alloc();
-		const char* file_name = "dump_frame_yuv.raw";
-		FILE* output_file = fopen(file_name, "w");
-		AVFrame *tmp_frame;
 
-		if (frame->format == AV_PIX_FMT_DRM_PRIME) {
-			/* retrieve data from GPU to CPU */
-			if ((ret = av_hwframe_transfer_data(sw_frame, frame, 0)) < 0) {
-				fprintf(stderr, "Error transferring the data to system memory\n");
-				goto fail;
-			}
-			tmp_frame = sw_frame;
-		} else
-			tmp_frame = frame;
-
-		size = av_image_get_buffer_size((AVPixelFormat)tmp_frame->format, tmp_frame->width,
-										tmp_frame->height, 1);
-
-		buffer = static_cast<uint8_t *>(av_malloc(size));
-		if (!buffer) {
-			fprintf(stderr, "Can not alloc buffer\n");
-			ret = AVERROR(ENOMEM);
-			goto fail;
-		}
-		ret = av_image_copy_to_buffer(buffer, size,
-									  (const uint8_t * const *)tmp_frame->data,
-									  (const int *)tmp_frame->linesize, (AVPixelFormat)tmp_frame->format,
-									  tmp_frame->width, tmp_frame->height, 1);
-
-		if (ret < 0) {
-			fprintf(stderr, "Can not copy image to buffer\n");
-			goto fail;
-		}
-
-		if ((ret = fwrite(buffer, 1, size, output_file)) < 0) {
-			fprintf(stderr, "Failed to dump raw data.\n");
-			goto fail;
-		}
-
-		
-		fclose(output_file);
-		printf("FRAMEDUMP!\n");
-		tmpCount++;
-	}
-	
-	
 fail:	/// this happens even without fail
 	///av_frame_free(&frame);
 	av_packet_unref(&packet);
-	if (ret < 0)
-		return 0;
-the_end:
 	return 1;
 	} /// END while(1)
 	
 	return 1;
 }
 
-//not used!?
-void IO::FreeAVFrame()
-{
+
+void IO::ScreenGrab()
+{	
+	int ret;
+	AVFrame *sw_frame = nullptr;
+	sw_frame = av_frame_alloc();
+	AVFrame *tmp_frame;
+
+	int outWidth = frame->width;
+	int outHeight = frame->height;
+	size_t size = av_image_get_buffer_size((AVPixelFormat)AV_PIX_FMT_RGB24, outWidth, outHeight, 1);
+
+	if (frame->format == AV_PIX_FMT_DRM_PRIME) {
+		/// retrieve data from GPU to CPU
+		if ((ret = av_hwframe_transfer_data(sw_frame, frame, 0)) < 0) {
+			fprintf(stderr, "Error transferring the data to system memory\n");
+			return;
+		}
+		tmp_frame = sw_frame;
+	} else
+		tmp_frame = frame;
+
+	/// https://newbedev.com/how-to-convert-rgb-from-yuv420p-for-ffmpeg-encoder 
+	SwsContext * ctx = sws_getContext(outWidth, outHeight,
+							  AV_PIX_FMT_YUV420P, outWidth, outHeight,
+							  AV_PIX_FMT_RGB24, 0, 0, 0, 0);
+
+	AVFrame * newOutFrame;
+	newOutFrame = av_frame_alloc();
+	uint8_t *out_buffer;  
+	out_buffer=new uint8_t[3*outWidth*outHeight];
+	av_image_fill_arrays (newOutFrame->data, newOutFrame->linesize, out_buffer, AV_PIX_FMT_RGB24, outWidth, outHeight, 1);
+	sws_scale(ctx, (const uint8_t* const*)tmp_frame->data, tmp_frame->linesize, 0, outHeight, newOutFrame->data, newOutFrame->linesize);
+	
+	std::string filename("/home/");
+	filename.append(getenv("USER"));
+	filename.append("/.config/Chiaki/screengrab.jpg");
+	///const char* file_name = "screengrab.jpg";
+	//FILE* output_file = fopen(filename.c_str(), "w");
+
+	///int stbi_write_jpg(char const *filename, int w, int h, int comp, const void *data, int quality);
+	///stbi_write_jpg(file_name, outWidth, outHeight, 3, (const void*)newOutFrame->data[0], 90);
+	if (stbi_write_jpg(filename.c_str(), outWidth, outHeight, 3, (const void*)newOutFrame->data[0], 90) < 1) {
+		fprintf(stderr, "Failed to save screen grab\n");
+		//fclose(output_file);
+		return;
+	}
+
+	//fclose(output_file);
+	printf("Saved a screen grab\n");
 }
+
 
 /// happens on Session start
 void IO::InitAudioCB(unsigned int channels, unsigned int rate)

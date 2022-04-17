@@ -30,7 +30,7 @@ int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
 /// The text blurbs for the info panel.
 const char* ChiakiGetHelpText(int n)
 {
-	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n  R3 + Circle = Quit Play Session\n\nHotkeys:\n  F11 = Toggle Fullscreen";
+	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n  R3 + Circle = Quit Play Session\nR3+Square = Screen grab\n\nHotkeys:\n  F11 = Toggle Fullscreen";
 	if(n==1)
 		text = "VIDEO DECODER:\n\nThe software that decodes the video stream. The actual decode happens on the Pi's hardware but this decides which API to use.\n\nCurrently only v4l2 is available and this is used through ffmpeg";
 	if(n==2)
@@ -149,6 +149,16 @@ static const GLchar* fragment_shader_source =
 	"	gl_FragColor = texture2D( texture, v_texCoord );\n"
 	"	//out_color = vec4(v_texCoord.x,v_texCoord.y,0,1);\n"
 	"}\n";
+
+static const GLchar* bg_shader_source =
+	"#version 100\n"
+	"precision mediump float;\n"
+	"uniform sampler2D texture;\n"
+	"varying vec2 v_texCoord;\n"
+	"void main() {	\n"
+	"	gl_FragColor = texture2D( texture, v_texCoord );\n"
+	"}\n";
+
 	
 GLint common_get_shader_program(const char *vertex_shader_source, const char *fragment_shader_source) {
 	enum Consts {INFOLOG_LEN = 512};
@@ -324,20 +334,27 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	std::string tx5 = mainpath + "ps5_orange_01.png";
 	imret = LoadTextureFromFile(tx5.c_str(), &gui_textures[5], &my_image_width, &my_image_height);
 	IM_ASSERT(imret);
-	
+
 	std::string tx6 = mainpath + "ps5_blue_01.png";
 	imret = LoadTextureFromFile(tx6.c_str(), &gui_textures[6], &my_image_width, &my_image_height);
 	IM_ASSERT(imret);
-		
-	
+
+
 	SwitchHostImage(0); /// to 'unknown' as default start
-	
+
 	std::string tx7 = mainpath + "logo_01.png";
 	LoadTextureFromFile(tx7.c_str(), &logo_texture, &logo_width, &logo_height);
 	IM_ASSERT(imret);
-	///logo_width = 541;
-	///logo_height = 124;
-	
+
+	bg_program = common_get_shader_program(vertex_shader_source, bg_shader_source);
+	std::string filename("/home/");
+	filename.append(getenv("USER"));
+	filename.append("/.config/Chiaki/screengrab.jpg");
+	int ww, hh;
+	LoadTextureFromFile(filename.c_str(), &bg_texture, &ww, &hh);
+	IM_ASSERT(imret);
+
+	InitVideoGl();
 
 	printf("Gui init done\n");
 }
@@ -495,6 +512,7 @@ bool ImguiSdlWindow::start()
 	while (!done)
 	{	
 		
+		/// Wait for a fresh decoded frame
 		bool got_frame = false;
 		while(!got_frame && !guiActive)
 		{	
@@ -556,13 +574,22 @@ void ImguiSdlWindow::CreateImguiWidgets()
 			int subPanelSzYtop = (dspszY*0.9) * (1.0-botHgt) - 20;  /// the -20 is fudge
 			int subPanelSzYbot = (dspszY*0.9) * botHgt;
 			
+			/// BG Window for textured backdrop
+			ImGui::SetNextWindowSize(ImVec2((int)dspszX+8, (int)dspszY+8), ImGuiCond_Always);
+			ImGui::SetNextWindowPos(ImVec2((int)-4, (int)-4), ImGuiCond_Always);
+			bool* b_open = new bool;
+			ImGui::Begin("BG Window", b_open, window_flags|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoMouseInputs);
+			ImDrawList* draw_listA = ImGui::GetWindowDrawList();
+			draw_listA->AddImage((void*)(intptr_t)bg_texture, ImVec2(0, 0), ImVec2(dspszX, dspszY) );
+			ImGui::End();
+			
 			ImGui::SetNextWindowSize(ImVec2((int)imio.DisplaySize.x*0.9, (int)imio.DisplaySize.y*0.9), ImGuiCond_Always);
 			ImGui::SetNextWindowPos(ImVec2((int)imio.DisplaySize.x*0.05, (int)imio.DisplaySize.y*0.05), ImGuiCond_Always);
-			ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(ImColor((int)clear_color.x, (int)clear_color.y, (int)clear_color.z, 64)));
-			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(ImColor(7, 20, 22, 128)));
-			
+			ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(ImColor((int)clear_color.x, (int)clear_color.y, (int)clear_color.z, 128)));
+			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(ImColor((int)clear_color.x, (int)clear_color.y, (int)clear_color.z, 64)));
+
 			bool* p_open = new bool;
-			if (ImGui::Begin("Parent Window", p_open, window_flags) )  /// Invisible(or not) parent window.
+			if (ImGui::Begin("Parent Window", p_open, window_flags) )
 			{
 				ImGui::PopStyleColor(2); /// num colors pushed
 					
@@ -642,9 +669,10 @@ void ImguiSdlWindow::CreateImguiWidgets()
 				}
 
 				ImGui::BeginChild("LowerHalfPanel", ImVec2(ImGui::GetWindowSize().x, subPanelSzYbot), false, ImGuiWindowFlags_NavFlattened);
+									
 					
 					ImDrawList* draw_list = ImGui::GetWindowDrawList();
-										
+					
 					ImGui::BeginChild("LogoPanel", ImVec2(subPanelSzX, subPanelSzYbot), false, ImGuiWindowFlags_NavFlattened);
 						draw_list->AddRectFilled(ImVec2(dspszX*0.05+brdr, dspszY*(1.0-botHgt)), ImVec2(dspszX*0.05+subPanelSzX-brdr, dspszY*0.05 + dspszY*0.9 - brdr), IM_COL32(200, 255, 64, 255), 8.0);
 						float logo_scaled_height = ((float)logo_height/(float)logo_width) * subPanelSzX;
@@ -679,12 +707,14 @@ void ImguiSdlWindow::CreateImguiWidgets()
 						ImGui::Text(ChiakiGetHelpText(help_text_n));
 						ImGui::PopTextWrapPos();
 						/// 2d point position corners, in window(?) space. Clipped by edges of parent.
-						draw_list->AddRectFilled(ImVec2(dspszX*0.05+subPanelSzX*2+brdr, dspszY*(1.0-botHgt)), ImVec2(dspszX*0.95-brdr, dspszY*0.05 + dspszY*0.9 - brdr), IM_COL32(5, 5, 5, 64), 8.0);
+						draw_list->AddRectFilled(ImVec2(dspszX*0.05+subPanelSzX*2+brdr, dspszY*(1.0-botHgt)), ImVec2(dspszX*0.95-brdr, dspszY*0.05 + dspszY*0.9 - brdr), IM_COL32(5, 5, 5, 85), 8.0);
 					ImGui::EndChild();
 					
 				ImGui::EndChild();
 			}/// END parent window
 			ImGui::End();
+			
+			//ImGui::End();//TEST!
 }
 
 
@@ -788,7 +818,6 @@ void ImguiSdlWindow::RefreshScreenDraw()
 
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	/// Draw video frame texture
 	///glUseProgram(program);//not needed
 	if(!guiActive)
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -831,7 +860,6 @@ int ImguiSdlWindow::InitVideoGl()
 	glVertexAttribPointer(uvs, 2, GL_FLOAT, GL_FALSE, 0,  (void*)sizeof(vertices) ); /// last is offset to loc in buf memory
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-
     /// Test with static data texture (from above) works. (edit shader too)
     //~ glBindTexture(GL_TEXTURE_2D, texture);
 	//~ glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);//or GL_LINEAR
@@ -857,8 +885,6 @@ int ImguiSdlWindow::InitVideoGl()
 	SDL_GetWindowWMInfo(sdl_window, &WMinfo);
 	EGLNativeDisplayType hwnd = WMinfo.info.x11.display;  /// WMinfo.info.kmsdrm.drm_fd, WMinfo.info.x11.display
 	egl_display = eglGetDisplay(hwnd);
-	
-	
 
 	return 1;
 }

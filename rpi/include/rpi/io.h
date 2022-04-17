@@ -99,6 +99,7 @@ class IO
 		void SpecialControlHandler();
 		ChiakiControllerState GetState();
 		void SendFeedbackState();
+		void ScreenGrab();
 		
 		int InitFFmpeg();
 		int FiniFFmpeg();
@@ -106,7 +107,6 @@ class IO
 		AVFramesList frames_list;
 		int drm_fd;
 		bool takeInput=0;
-		void FreeAVFrame();//remove?
 		void ShutdownStreamDrm();
 		void SwitchInputReceiver(std::string target);	/// gui/session
 		uint32_t myEventType1;

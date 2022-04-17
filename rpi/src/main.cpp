@@ -71,7 +71,7 @@ int main()
 			screen_height = sdl_top_mode.h;
 		}
 		
-		printf("  Disp Mode: \t%dx%dpx @ %dhz \n", sdl_top_mode.w, sdl_top_mode.h, sdl_top_mode.refresh_rate);
+		printf("Disp Mode: \t%dx%dpx @ %dhz \n", sdl_top_mode.w, sdl_top_mode.h, sdl_top_mode.refresh_rate);
 	}
 	
     /// Create an application window with the following settings:
@@ -144,7 +144,7 @@ int main()
 	SDL_RendererInfo info;
 	SDL_GetRendererInfo( sdl_renderer, &info );
 	printf("SDL_RENDER_DRIVER selected: %s\n", info.name);
-	///SDL_SetRenderDrawBlendMode(sdl_renderer, SDL_BLENDMODE_BLEND);
+	SDL_SetRenderDrawBlendMode(sdl_renderer, SDL_BLENDMODE_BLEND);
 	
 	
 	/// ...but needs to be here for CLI

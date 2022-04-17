@@ -192,8 +192,8 @@ _ffmpeg_find(avutil     avutil.h)
 #  avutil)
 _ffmpeg_find(swresample swresample.h
   avutil)
-#_ffmpeg_find(swscale    swscale.h
-#  avutil)
+_ffmpeg_find(swscale    swscale.h
+  avutil)
 _ffmpeg_find(avcodec    avcodec.h
   avutil)
 _ffmpeg_find(avformat   avformat.h

@@ -174,12 +174,14 @@ class ImguiSdlWindow
 		/// textures for gui
 		GLuint gui_textures[16] = {(GLuint)0};
 		GLuint current_host_texture = 0;
+		GLuint bg_texture;
 		GLuint logo_texture;
 		int logo_width = 0;
 		int logo_height = 0;
 		
 		/// v4l2-gl/ffmpeg things
 		GLuint program;
+		GLuint bg_program;
 		GLuint texture;
 		GLuint new_texture;
 		bool hasTexInit=false;
