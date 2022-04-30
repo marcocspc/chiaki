@@ -691,8 +691,19 @@ void ImguiSdlWindow::CreateImguiWidgets()
 						if (ImGui::Button("Wake Up", ImVec2(160, 30))) {}
 						
 						if (ImGui::Button("Connect", ImVec2(160, 30))) {
-						
+							
+							SDL_SysWMinfo WMinfo;
+							SDL_VERSION(&WMinfo.version);
+							SDL_GetWindowWMInfo(sdl_window, &WMinfo);
+							printf("SDL drm_fd:  %d\n", WMinfo.info.kmsdrm.drm_fd);
+							io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
+							
+							io->InitFFmpeg();
+							InitVideoGl();
 							host->RemoteStartSession();
+							guiActive = 0;
+							io->SwitchInputReceiver(std::string("session"));
+							setClientState("playing");
 						}
 						
 
