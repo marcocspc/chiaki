@@ -27,20 +27,20 @@ std::vector<char> KeyStr2ByteArray(std::string in_str) {
 				if(*it == 92) { /// oops backslash again, so single symbol hex
 					///leaving hex[1] unset bad but works?
 					std::istringstream(hex) >> std::hex >> n;
-					//std::cout << std::dec << "Hex gives " << n << '\n';
+					///std::cout << std::dec << "Hex gives " << n << '\n';
 					key_bytes_out.push_back(n);
 					it--; /// rewind one step
 				} else {
 					hex[1] = *it;
 					int n;
 					std::istringstream(hex) >> std::hex >> n;
-					//std::cout << std::dec << "Hex gives " << n << '\n';
+					///std::cout << std::dec << "Hex gives " << n << '\n';
 					key_bytes_out.push_back(n);
 				}
 			} /// end Case1
 			else { /// we assume regular escape char - Case2
 
-				//printf("It:%d ", *it); /// prints correctly
+				///printf("It:%d ", *it); /// prints correctly
 				int n;
 				
 				/// \'=39
@@ -66,13 +66,13 @@ std::vector<char> KeyStr2ByteArray(std::string in_str) {
 				/// \v=11 but 'v'=118
 				if(*it==118) n=11;
 				
-				//std::cout << std::dec << "Esc char is " << n << '\n';
+				///std::cout << std::dec << "Esc char is " << n << '\n';
 				key_bytes_out.push_back(n);			
 			} ///end Case2		
 		} else { /// regular single symbol - Case3
 			
 			int n = *it;
-			//printf("Std Char: %d \n", n);
+			///printf("Std Char: %d \n", n);
 			key_bytes_out.push_back(n);
 		} /// end Case 3
 	} /// End str iterator
@@ -99,11 +99,6 @@ std::string GetValueForToken(std::string line, std::string token)
 
 RpiSettings::RpiSettings()
 {
-	//~ sessionSettingsNames.push_back("decoder");
-	//~ sessionSettingsNames.push_back("codec");
-	//~ sessionSettingsNames.push_back("resolution");
-	//~ sessionSettingsNames.push_back("fps");
-	//~ sessionSettingsNames.push_back("audio");
 }
 
 RpiSettings::~RpiSettings()
@@ -221,19 +216,20 @@ ChiakiVideoFPSPreset RpiSettings::GetChiakiFps(std::string choice)
 	else return CHIAKI_VIDEO_FPS_PRESET_60;
 }
 
+
 /// Currently only supports one host in file
 /// Reads straight into RpiSettings variable
 /// Does not yet handle multiple hosts
-void RpiSettings::ReadYaml()
+std::vector<rpi_settings_host> RpiSettings::ReadSettingsYaml(std::string filename)
 {	
-	std::string filename("/home/");
-	filename.append(getenv("USER"));
-
-	filename.append("/.config/Chiaki/Chiaki_rpi.conf");
+	//~ std::string filename("/home/");
+	//~ filename.append(getenv("USER"));
+	//~ filename.append("/.config/Chiaki/Chiaki_rpi.conf");
 	std::vector<std::string> in_strings;
 	
-	printf("Will try to read rpi settings file: %s\n", filename.c_str());
+	std::vector<rpi_settings_host> out_hosts_settings;
 	
+	printf("Will try to read rpi settings file: %s\n", filename.c_str());	
 	/// OPen the file and read all the data
 	fstream file;
 	file.open(filename, std::fstream::in);
@@ -246,8 +242,8 @@ void RpiSettings::ReadYaml()
       
       file.close();
     } else {
-		printf("Couldn't open the file\n");
-		return;
+		printf("Couldn't open the settings file\n");
+		return out_hosts_settings;
 	}
 
 
@@ -295,7 +291,7 @@ void RpiSettings::ReadYaml()
 	}
 	
 	if(n_hosts > 0) {
-		all_read_settings.push_back(bufHost);
+		out_hosts_settings.push_back(bufHost);
 		printf("Found settings for %d host(s)\n", n_hosts);
 	}
 	
@@ -303,7 +299,7 @@ void RpiSettings::ReadYaml()
 	
 	/// Finish
 	
-  return ;
+  return out_hosts_settings;
 }
 
 /// not using actual libyaml to write. Seemed too complicated.

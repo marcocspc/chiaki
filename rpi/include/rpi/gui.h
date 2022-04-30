@@ -112,6 +112,8 @@ class ImguiSdlWindow
 		Host *host = nullptr; 	/// controller state, session
 		IO *io = nullptr;	    /// input, decode, rendering, audio
 		RpiSettings *settings = nullptr;
+		std::string home_dir;
+		
 		
 		bool start();
 		int hostClick();
@@ -132,6 +134,9 @@ class ImguiSdlWindow
 		/// Imgui things
 		void SettingsDraw(int widgetID, const char* label, std::vector<std::string> list, std::string &select);
 		void SwitchHostImage(int which);
+		
+		std::vector<std::string>  remoteHostFiles;
+		std::string sel_remote;
 		
 		std::vector<std::string> decoder_options;
 		std::string sel_decoder;
@@ -159,6 +164,7 @@ class ImguiSdlWindow
 		bool open_regist = false;
 		std::string regist_acc_id;
 		std::string regist_pin;
+		int remoteIp[4];// = { 0, 0, 0, 0 };
 		
 		SDL_GLContext *gl_ctx;
 		SDL_Window *sdl_window = nullptr; 

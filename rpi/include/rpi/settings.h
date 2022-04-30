@@ -45,14 +45,13 @@ class RpiSettings
 		RpiSettings();
 		~RpiSettings();
 		size_t GetB64encodeSize(size_t in);
-		void ReadYaml();	/// reads into 'all_host_settings'
+		std::vector<rpi_settings_host>  ReadSettingsYaml(std::string filename);	// reads into 'all_host_settings'
 		void WriteYaml(std::vector<rpi_settings_host> all_host_settings);
 		void PrintHostSettings(rpi_settings_host host);
 		void RefreshSettings(std::string setting, std::string choice);  /// both memory and file
 		
-		//std::vector<rpi_settings_host> all_host_settings; 		// old validated settings
-		std::vector<rpi_settings_host> all_read_settings; 		// NEW read settings
-		std::vector<rpi_settings_host> all_validated_settings; 	// NEW validated settings, session runs off these. 
+		std::vector<rpi_settings_host> all_read_settings; 		// all host settings as read from .conf file
+		std::vector<rpi_settings_host> all_validated_settings; 	// Read settings checked against Discovered hosts
 		
 		ChiakiCodec GetChiakiCodec(std::string choice);
 		ChiakiVideoResolutionPreset GetChiakiResolution(std::string choice);

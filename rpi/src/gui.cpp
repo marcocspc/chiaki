@@ -1,5 +1,6 @@
 #include <iostream>
 #include <stdio.h>
+#include <dirent.h>		/// list files
 #include <stdint.h>
 #include <assert.h>
 #include <unistd.h>		/// sleep()
@@ -27,10 +28,44 @@ int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
 	return out;
 }
 
+std::vector<std::string> GetFiles(const char* folderPath, const char* match)
+{	
+	std::vector<std::string>  outFileNames;
+	struct dirent *de;  // Pointer for directory entry
+  
+    /// opendir() returns a pointer of DIR type. 
+    DIR *dr = opendir(folderPath);
+  
+    if (dr == NULL)
+    {
+        printf("Could not open current directory" );
+        return outFileNames;
+    }
+  
+    while ((de = readdir(dr)) != NULL)
+    {
+            /// check if matches
+            int found = -1;
+            std::string tmp_s;
+            std::string s; s=de->d_name;
+            if((found = s.find(std::string(match))) > -1)
+			{
+				tmp_s = s.substr(0, s.find(".")); 
+				///printf("%s\n", tmp_s.c_str());
+				outFileNames.push_back(tmp_s);
+			}
+            
+	}
+  
+    closedir(dr);
+    return outFileNames;
+}
+
+
 /// The text blurbs for the info panel.
 const char* ChiakiGetHelpText(int n)
 {
-	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n  R3 + Circle = Quit Play Session\n  R3+Square = Screen grab\n\nHotkeys:\n  F11 = Toggle Fullscreen";
+	const char* text = "\nWelcome to Chiaki!\n\n\nSpecial Combo's:\n  R3 + Circle = Quit Play Session\n  R3 + Square = Screen grab\n\nHotkeys:\n  F11 = Toggle Fullscreen";
 	if(n==1)
 		text = "VIDEO DECODER:\n\nThe software that decodes the video stream. The actual decode happens on the Pi's hardware but this decides which API to use.\n\nCurrently only v4l2 is available and this is used through ffmpeg";
 	if(n==2)
@@ -232,6 +267,12 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 		 IsX11 = true;
 	else IsX11 = false;
 	printf("Running under X11: %d\n", IsX11);
+	
+	/// establish user home dir
+	//std::string screengrab_name("/home/");
+	home_dir = std::string("/home/");
+	home_dir.append(getenv("USER"));
+
 			
 	/// not sure where the best place for this is?
 	host = new Host;
@@ -240,8 +281,11 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	io->Init(host);
 	host->Init(io);
 	io->InitGamepads();
+	
+	std::string settingsFile = home_dir;
+	settingsFile.append("/.config/Chiaki/Chiaki_rpi.conf");
 	settings = new RpiSettings();
-	settings->ReadYaml();  /// before starting discovery service
+	settings->all_read_settings = settings->ReadSettingsYaml(settingsFile);
 	
 	host->StartDiscoveryService();
 
@@ -347,14 +391,29 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	IM_ASSERT(imret);
 
 	bg_program = common_get_shader_program(vertex_shader_source, bg_shader_source);
-	std::string filename("/home/");
-	filename.append(getenv("USER"));
-	filename.append("/.config/Chiaki/screengrab.jpg");
+	std::string screengrab_name = home_dir;
+	screengrab_name.append("/.config/Chiaki/screengrab.jpg");
 	int ww, hh;
-	LoadTextureFromFile(filename.c_str(), &bg_texture, &ww, &hh);
+	LoadTextureFromFile(screengrab_name.c_str(), &bg_texture, &ww, &hh);
 	IM_ASSERT(imret);
 
-	InitVideoGl();
+	std::string path = std::string(home_dir + "/.config/Chiaki");
+	const char* match = ".remote";
+	remoteHostFiles = GetFiles(path.c_str(), match);
+	if(remoteHostFiles.size() > 0)
+		sel_remote = remoteHostFiles.at(0);
+	else
+		sel_remote = std::string("no remotes");
+	
+	
+	remoteIp[0]=0;
+	remoteIp[1]=0;
+	remoteIp[2]=0;
+	remoteIp[3]=0;
+	
+	
+	//InitVideoGl(); // not sure if I should keep here
+	
 
 	printf("Gui init done\n");
 }
@@ -597,8 +656,46 @@ void ImguiSdlWindow::CreateImguiWidgets()
 				ImGui::BeginChild("UpperHalfPanel", ImVec2(subPanelSzX*3, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
 				
 					ImGui::BeginChild("A", ImVec2(subPanelSzX, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
-						ImGui::Dummy(ImVec2(0, (subPanelSzYtop/2)-(20/2)) );  /// add offset space at top
-						/// Put some schnazzy useful ui thing here!
+						//ImGui::Dummy(ImVec2(0, (subPanelSzYtop/2)-(20/2)) );  /// add offset space at top
+						
+						/// gui for remote connections
+						ImGui::PushItemWidth(160.0f);   
+						ImGui::InputInt4("IPv4", remoteIp);
+						ImGui::PopItemWidth();
+						///printf("INT:  %d\n", remoteIp[3]);
+
+						const char* lbl="RemoteHost";
+						if(ImGui::Button(sel_remote.c_str(), ImVec2(160, 30) )){
+			
+							ImGui::OpenPopup(lbl);
+						}
+						if(remoteHostFiles.size() > 0)
+						{
+							if (ImGui::BeginPopup(lbl))
+							{   
+									for (uint8_t i = 0; i < remoteHostFiles.size(); i++)
+										if (ImGui::Selectable(remoteHostFiles.at(i).c_str() )){
+											sel_remote = remoteHostFiles.at(i);
+											// need to refresh settings in memory (which also writes to file)
+											// ChangeSettingAction(widgetID, select);
+											std::string remoteFile = home_dir;
+											remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
+											RpiSettings tmpsettings;
+											std::vector<rpi_settings_host> tmpRemoteSettings;
+											tmpRemoteSettings = tmpsettings.ReadSettingsYaml(remoteFile);
+											host->current_remote_settings = tmpRemoteSettings.at(0);
+										}
+									ImGui::EndPopup();
+							}
+						}
+						if (ImGui::Button("Wake Up", ImVec2(160, 30))) {}
+						
+						if (ImGui::Button("Connect", ImVec2(160, 30))) {
+						
+							host->RemoteStartSession();
+						}
+						
+
 					ImGui::EndChild();
 				
 					ImGui::SameLine();
@@ -713,8 +810,6 @@ void ImguiSdlWindow::CreateImguiWidgets()
 				ImGui::EndChild();
 			}/// END parent window
 			ImGui::End();
-			
-			//ImGui::End();//TEST!
 }
 
 
@@ -1009,8 +1104,10 @@ int ImguiSdlWindow::hostClick()
 		io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
 		
 		io->InitFFmpeg();
-		InitVideoGl();
+		if(IsX11)
+			InitVideoGl();
 		//sleep(1);	/// some time is needed here, was 1 
+		
 		host->StartSession();
 		guiActive = 0;
 		io->SwitchInputReceiver(std::string("session"));

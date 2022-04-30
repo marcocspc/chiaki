@@ -25,6 +25,8 @@
 //~ static void EventCB(ChiakiEvent *event, void *user);
 //~ static void DiscoveryCB(void *user);//not used?
 
+// Rename this Class Hosts?
+
 class Host
 {
 	private:
@@ -50,6 +52,7 @@ class Host
 		ChiakiDiscoveryService *service;
 		ChiakiDiscoveryHost *discoveredHosts = nullptr;
 		bool ps5 = false;	/// set by Discovery, not config read (overwrite if Config exists?)
+		rpi_settings_host current_remote_settings;
 
 		ChiakiThread play_th;
 		
@@ -60,6 +63,7 @@ class Host
 		void RegistStart(std::string accountID, std::string pin);
 		void SendWakeup();
 		int StartSession();
+		int RemoteStartSession();
 		void Play();
 		std::string GetHostRPKey(uint8_t rp_key[]);
 		
