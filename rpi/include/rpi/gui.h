@@ -164,7 +164,7 @@ class ImguiSdlWindow
 		bool open_regist = false;
 		std::string regist_acc_id;
 		std::string regist_pin;
-		int remoteIp[4];// = { 0, 0, 0, 0 };
+		int remoteIp[4];
 		
 		SDL_GLContext *gl_ctx;
 		SDL_Window *sdl_window = nullptr; 

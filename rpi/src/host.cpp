@@ -323,8 +323,8 @@ int Host::StartSession()
 	/// Take Host[0] data from settings!
 
 	char out2[CHIAKI_SESSION_AUTH_SIZE] = {'0'};
-	int stringlen = gui->settings->all_validated_settings.at(0).regist.length();
-	strncpy(out2, gui->settings->all_validated_settings.at(0).regist.c_str(), stringlen);
+	int stringlen = session_settings.regist.length();
+	strncpy(out2, session_settings.regist.c_str(), stringlen);
 	
 	memcpy(&connect_info.regist_key, out2, CHIAKI_SESSION_AUTH_SIZE);
 	printf("Regist for session:%sEND\n", connect_info.regist_key);
@@ -333,7 +333,7 @@ int Host::StartSession()
 	size_t rp_key_sz = sizeof(rp_key);
 	
 	chiaki_base64_decode(
-		gui->settings->all_validated_settings.at(0).rp_key.c_str(), gui->settings->all_validated_settings.at(0).rp_key.length(),
+		session_settings.rp_key.c_str(), session_settings.rp_key.length(),
 		rp_key, &rp_key_sz);
 	memcpy(&connect_info.morning, rp_key, rp_key_sz);
 	///printf("Rp Key:%sEND\n", connect_info.morning);
@@ -347,9 +347,9 @@ int Host::StartSession()
 	connect_info.ps5 = isPS5;
 	connect_info.video_profile_auto_downgrade = false;
 	connect_info.enable_keyboard = false;
-	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(gui->settings->all_validated_settings.at(0).sess.codec);
-	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(gui->settings->all_validated_settings.at(0).sess.resolution);
-	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(gui->settings->all_validated_settings.at(0).sess.fps);
+	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(session_settings.sess.codec);
+	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(session_settings.sess.resolution);
+	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(session_settings.sess.fps);
 	chiaki_connect_video_profile_preset(&connect_info.video_profile, resolution_preset, fps_preset);
 	connect_info.video_profile.bitrate = 15000;
 
@@ -384,98 +384,6 @@ int Host::StartSession()
 	return 0;
 }
 
-int Host::RemoteStartSession()
-{	
-	ChiakiErrorCode err;
-	
-	// Need:
-	// .regist
-	// rp key
-	// host addr / ip
-	// isPS5
-	// codec
-	// resolution
-	// fps
-
-	//printf("REMOTE isPS5 from setting:  %s\n", settings.all_read_settings.at(0).isPS5.c_str() );
-	ChiakiConnectInfo rem_connect_info;
-
-	///  ORIG REGIST PART  ---------------------------------------------
-	char out2[CHIAKI_SESSION_AUTH_SIZE] = {'0'};
-	int stringlen = current_remote_settings.regist.length();
-	strncpy(out2, current_remote_settings.regist.c_str(), stringlen);
-
-	memcpy(&rem_connect_info.regist_key, out2, CHIAKI_SESSION_AUTH_SIZE);
-	///printf("Regist for session:%sEND\n", rem_connect_info.regist_key);
-
-	uint8_t rp_key[0x10] = {0};
-	size_t rp_key_sz = sizeof(rp_key);
-	
-	chiaki_base64_decode(
-		current_remote_settings.rp_key.c_str(), current_remote_settings.rp_key.length(),
-		rp_key, &rp_key_sz);
-	memcpy(&rem_connect_info.morning, rp_key, rp_key_sz);
-	///printf("Rp Key:%sEND\n", connect_info.morning);
-
-	std::string remoteExternalIp(std::to_string(gui->remoteIp[0])+"."+std::to_string(gui->remoteIp[1])+"."+std::to_string(gui->remoteIp[2])+"."+std::to_string(gui->remoteIp[3]));
-	printf("IP FORM GUI:  %s\n", remoteExternalIp.c_str());
-	rem_connect_info.host = remoteExternalIp.c_str();
-	///printf("PS IP addr:  %s\n", connect_info.host); /// fred PS4:  192.168.1.65
-	
-	bool isPS5=false;
-	if(current_remote_settings.isPS5 == "1") isPS5 = true;
-
-	rem_connect_info.ps5 = isPS5;
-	rem_connect_info.video_profile_auto_downgrade = false;
-	rem_connect_info.enable_keyboard = false;
-	
-	RpiSettings tmpSettings;
-	//rem_connect_info.video_profile.codec = settings.GetChiakiCodec(settings.all_read_settings.at(0).sess.codec);
-	rem_connect_info.video_profile.codec = CHIAKI_CODEC_H264;
-	//ChiakiVideoResolutionPreset resolution_preset = settings.GetChiakiResolution(settings.all_read_settings.at(0).sess.resolution);
-	ChiakiVideoResolutionPreset resolution_preset = CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
-	ChiakiVideoFPSPreset fps_preset = tmpSettings.GetChiakiFps(current_remote_settings.sess.fps);
-	chiaki_connect_video_profile_preset(&rem_connect_info.video_profile, resolution_preset, fps_preset);
-	rem_connect_info.video_profile.bitrate = 15000;
-
-	///session.connect_info = rem_connect_info;
-	session.connect_info.ps5 = rem_connect_info.ps5;
-	session.connect_info.video_profile_auto_downgrade = rem_connect_info.video_profile_auto_downgrade;
-	session.connect_info.video_profile.codec = rem_connect_info.video_profile.codec;
-	session.connect_info.enable_keyboard = rem_connect_info.enable_keyboard;
-	session.connect_info.video_profile = rem_connect_info.video_profile;
-	session.connect_info.video_profile.bitrate = rem_connect_info.video_profile.bitrate;
-
-	err = chiaki_session_init(&session, &rem_connect_info, &log);
-	if(err != CHIAKI_ERR_SUCCESS)
-	{
-		printf("Failed to init session\n");
-		return 1;
-	}
-
-	chiaki_opus_decoder_set_cb(&opus_decoder, InitAudioCB, AudioCB, io);
-	chiaki_opus_decoder_get_sink(&opus_decoder, &audio_sink);
-	chiaki_session_set_audio_sink(&session, &audio_sink);
-	chiaki_session_set_video_sample_cb(&session, VideoCB, io); /// send to IO to execute
-
-	/// Actually start		
-	err = chiaki_session_start(&session);
-	if(err != CHIAKI_ERR_SUCCESS)
-	{
-		printf("ERROR chiaki session start\n");
-		CHIAKI_LOGE(&log, "Session start failed: %s\n", chiaki_error_string(err));
-		return 1;
-	}
-	printf("Session Bitrate:  %d\n", session.connect_info.video_profile.bitrate);
-	///printf("Session target:  %d\n", session.target);
-
-	chiaki_session_set_event_cb(&session, EventCB, this);
-	
-	chiaki_discovery_service_fini(service); /// service is not a pointer in 'Gui'
-	
-	printf("END chiaki session start\n");
-	return 0;
-}
 
 void Host::ConnectionEventCB(ChiakiEvent *event)
 {

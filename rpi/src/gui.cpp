@@ -400,12 +400,17 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	std::string path = std::string(home_dir + "/.config/Chiaki");
 	const char* match = ".remote";
 	remoteHostFiles = GetFiles(path.c_str(), match);
-	if(remoteHostFiles.size() > 0)
+	if(remoteHostFiles.size() > 0) {
 		sel_remote = remoteHostFiles.at(0);
-	else
+		std::string remoteFile = home_dir;
+		remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
+		RpiSettings tmpsettings;
+		std::vector<rpi_settings_host> tmpRemoteSettings;
+		tmpRemoteSettings = tmpsettings.ReadSettingsYaml(remoteFile);
+		host->current_remote_settings = tmpRemoteSettings.at(0);
+	} else
 		sel_remote = std::string("no remotes");
-	
-	
+
 	remoteIp[0]=0;
 	remoteIp[1]=0;
 	remoteIp[2]=0;
@@ -698,9 +703,10 @@ void ImguiSdlWindow::CreateImguiWidgets()
 							printf("SDL drm_fd:  %d\n", WMinfo.info.kmsdrm.drm_fd);
 							io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
 							
+							host->session_settings = host->current_remote_settings;
 							io->InitFFmpeg();
 							InitVideoGl();
-							host->RemoteStartSession();
+							host->StartSession();
 							guiActive = 0;
 							io->SwitchInputReceiver(std::string("session"));
 							setClientState("playing");
@@ -1106,6 +1112,9 @@ int ImguiSdlWindow::hostClick()
 	if(client_state == "ready") /// blue
 	{
 		printf("Starting Play session!\n");
+		
+		/// copy over settings
+		host->session_settings = settings->all_validated_settings.at(0);
 		
 		/// transfer drm_fd, only used for CLI/non-x11
 		SDL_SysWMinfo WMinfo;

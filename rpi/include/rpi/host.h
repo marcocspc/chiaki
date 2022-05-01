@@ -31,7 +31,6 @@ class Host
 {
 	private:
 		ChiakiConnectVideoProfile video_profile;
-		
 		ChiakiAudioSink audio_sink;
 		
 		/// REGISTERING
@@ -53,6 +52,7 @@ class Host
 		ChiakiDiscoveryHost *discoveredHosts = nullptr;
 		bool ps5 = false;	/// set by Discovery, not config read (overwrite if Config exists?)
 		rpi_settings_host current_remote_settings;
+		rpi_settings_host session_settings;
 
 		ChiakiThread play_th;
 		
@@ -63,7 +63,6 @@ class Host
 		void RegistStart(std::string accountID, std::string pin);
 		void SendWakeup();
 		int StartSession();
-		int RemoteStartSession();
 		void Play();
 		std::string GetHostRPKey(uint8_t rp_key[]);
 		

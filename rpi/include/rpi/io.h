@@ -26,6 +26,7 @@ extern "C"
 #define MAX_NUM_JOYSTICKS 2
 
 #include "rpi/host.h"
+#include "rpi/settings.h"
 
 #include <setsu.h>
 #include <chiaki/orientation.h>

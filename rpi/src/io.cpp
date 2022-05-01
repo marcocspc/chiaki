@@ -24,15 +24,20 @@ void AVFramesList::Increment()///current
 	//~ if(next == 0) current = size-1;
 	//~ else current = next-1;
 	current=next;
+	// shouldn't next also increment!?
+	//if(next == size-1) next=0;
+	//else next++;
 	
 	///printf("Curr:  %d    Next:  %d\n", current, next);
 }
 
+/// Called for both display outputs
 AVFrame* AVFramesList::GetNextFreed()
 {
 	//is already max?
 	if(next == size-1) next=0;
 	else next++;
+	// shouldn't currentl also increment
 	
 	//av_frame_free(&frameslist[next]);
 	frameslist[next] = av_frame_alloc();//should check for success
@@ -435,7 +440,7 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 	AVCodec *av_codec;
 	
 	const char *codec_name = "h264_v4l2m2m";
-	ChiakiCodec chi_codec = host->gui->settings->GetChiakiCodec(host->gui->settings->all_validated_settings.at(0).sess.codec);
+	ChiakiCodec chi_codec = host->gui->settings->GetChiakiCodec(host->session_settings.sess.codec);
 	if(chi_codec == CHIAKI_CODEC_H265)
 		codec_name = "hevc";
 
@@ -473,13 +478,16 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 	/// Needs to match actual session resolution
 	int width_setting = 1280;
 	int height_setting = 720;
-	ChiakiVideoResolutionPreset resolution_preset = host->gui->settings->GetChiakiResolution(host->gui->settings->all_validated_settings.at(0).sess.resolution);
+	ChiakiVideoResolutionPreset resolution_preset = host->gui->settings->GetChiakiResolution(host->session_settings.sess.resolution);
 	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_1080p) { width_setting=1920; height_setting=1080; }
 	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_720p)  { width_setting=1280; height_setting=720; }
 	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_540p)  { width_setting=960;  height_setting=540; }
     codec_context->coded_height = height_setting;
 	codec_context->coded_width = width_setting;
 	codec_context->pix_fmt = AV_PIX_FMT_DRM_PRIME;  /// request a DRM frame
+	
+	// test
+	codec_context->thread_count = 1;
 
 	if (avcodec_open2(codec_context, av_codec, nullptr) < 0) {
 		printf("Could not open codec\n");
@@ -520,16 +528,16 @@ int IO::FiniFFmpeg()
 /// For kmsdrm render and gl render
 bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 {	
-	//printf("In VideoCB\n");	
+	///printf("In VideoCB\n");	
 	AVPacket packet;
 	av_init_packet(&packet); // Deprecated2021 NEW->  AVPacket* packet = av_packet_alloc();
 	packet.data = buf;
 	packet.size = buf_size;
 	int ret = 0;
-		    
-   // if(&packet)
-    if(1)
-	{	
+
+	if(&packet)
+    //if(1)
+	{
 		ret = avcodec_send_packet(codec_context, &packet);
 		/// printf("Send Packet (sample_cb) return;  %d\n", r);
 		/// In particular, we don't expect AVERROR(EAGAIN), because we read all
@@ -538,19 +546,18 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 		  printf("Error return in send_packet\n");
 	    }
 	}
-	
+
 	///NEED TO FREE THE CLASS FRAME
 	av_frame_free(&frame);
-	
+
     while (1) {
         //~ if (!(frame = av_frame_alloc())) { //can this be removed with queue?
             //~ fprintf(stderr, "Can not alloc frame\n");
             //~ ret = AVERROR(ENOMEM);
-            //~ goto the_end;
+            //~ //goto the_end;
         //~ }
-        
-        frame = frames_list.GetNextFreed();/// get empty frame pointer, allocated
-		ret = avcodec_receive_frame(codec_context, frame); //ret 0 ==success
+        frame = frames_list.GetNextFreed();/// get fresh empty frame pointer, allocated
+		ret = avcodec_receive_frame(codec_context, frame); /// the actual decode, ret 0 ==success
 
 		///printf("PIX Format after receive_frame:  %d\n", frame->format);//181
 		if (ret == 0) {
@@ -558,11 +565,13 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 						
 			if(host->gui->IsX11)
 			{	
-				frames_list.Increment();/// increments 'current' for pull
+				frames_list.Increment();/// increments 'current' for texture upload
 				nextFrameCount++;
 			} else {
+				///frames_list.Increment(); TEST
 				drmprime_out_display(dpo, frame); /// drm pipe
 			}
+			
 
 		}
 		if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
@@ -573,7 +582,6 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 		}
 
 
-fail:	/// this happens even without fail
 	///av_frame_free(&frame);
 	av_packet_unref(&packet);
 	return 1;
@@ -661,8 +669,8 @@ void IO::InitAudioCB(unsigned int channels, unsigned int rate)
 	want.samples = 1024;
 	want.callback = NULL;
 	
-	std::string current_out_choice = host->gui->settings->all_validated_settings.at(0).sess.audio_device;
-	printf("Session Audio OUT:  %s\n", current_out_choice.c_str());
+	std::string current_out_choice = host->session_settings.sess.audio_device;
+	//printf("Session Audio OUT:  %s\n", current_out_choice.c_str());
 	
 	if(audio_out_devices.size() > 0)
 	{
