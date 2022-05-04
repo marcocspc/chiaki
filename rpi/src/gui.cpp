@@ -418,8 +418,9 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	remoteIp[1]=0;
 	remoteIp[2]=0;
 	remoteIp[3]=0;
+	/// protect for old files
 	std::vector<std::string> ipvec = StringIpToVector(host->current_remote_settings.remote_ip);
-	if(ipvec.at(0) != "0" && ipvec.at(1) != "0") {
+	if(ipvec.size() != 0 && ipvec.at(0) != "0" && ipvec.at(1) != "0") {
 		remoteIp[0]=stoi(ipvec.at(0));
 		remoteIp[1]=stoi(ipvec.at(1));
 		remoteIp[2]=stoi(ipvec.at(2));
@@ -702,10 +703,12 @@ void ImguiSdlWindow::CreateImguiWidgets()
 											
 											/// Refresh IP int fields gui
 											std::vector<std::string> ipvec = StringIpToVector(host->current_remote_settings.remote_ip);
-											remoteIp[0]=stoi(ipvec.at(0));
-											remoteIp[1]=stoi(ipvec.at(1));
-											remoteIp[2]=stoi(ipvec.at(2));
-											remoteIp[3]=stoi(ipvec.at(3));
+											if(ipvec.size() != 0) {
+												remoteIp[0]=stoi(ipvec.at(0));
+												remoteIp[1]=stoi(ipvec.at(1));
+												remoteIp[2]=stoi(ipvec.at(2));
+												remoteIp[3]=stoi(ipvec.at(3));
+											}
 										}
 									ImGui::EndPopup();
 							}
