@@ -339,7 +339,8 @@ int Host::StartSession()
 	memcpy(&connect_info.morning, rp_key, rp_key_sz);
 	///printf("Rp Key:%sEND\n", connect_info.morning);
 	
-	connect_info.host = discoveredHosts->host_addr;
+	//connect_info.host = discoveredHosts->host_addr;
+	connect_info.host = session_settings.remote_ip.c_str();
 	///printf("PS IP addr:  %s\n", connect_info.host);
 	
 	bool isPS5=false;
