@@ -1146,6 +1146,7 @@ int ImguiSdlWindow::hostClick()
 		
 		/// copy over settings
 		host->session_settings = settings->all_validated_settings.at(0);
+		host->session_settings.remote_ip = host->discoveredHosts->host_addr;
 		
 		/// transfer drm_fd, only used for CLI/non-x11
 		SDL_SysWMinfo WMinfo;
