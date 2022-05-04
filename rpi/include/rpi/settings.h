@@ -3,6 +3,8 @@
 
 #include <string>
 #include <iostream>
+//#include <sstream>		/// split
+#include <iterator>		/// split
 #include <fstream>
 #include <vector>
 #include <algorithm>	/// remove_if()
@@ -20,6 +22,7 @@
 #include <chiaki/session.h>
 
 std::string GetValueForToken(std::string line, std::string token);
+std::vector<std::string> StringIpToVector(std::string ip);
 //std::vector<char> KeyStr2ByteArray(std::string in_str);
 
 struct rpi_settings_session {
@@ -34,6 +37,7 @@ struct rpi_settings_host{
 	std::string isPS5; /// 0,1
 	std::string nick_name;
 	std::string id; ///mac
+	std::string remote_ip;
 	std::string rp_key;
 	std::string regist;
 	rpi_settings_session sess;
@@ -46,15 +50,15 @@ class RpiSettings
 		~RpiSettings();
 		size_t GetB64encodeSize(size_t in);
 		std::vector<rpi_settings_host>  ReadSettingsYaml(std::string filename);	// reads into 'all_host_settings'
-		void WriteYaml(std::vector<rpi_settings_host> all_host_settings);
+		void WriteYaml(std::vector<rpi_settings_host> all_host_settings, std::string filename);
 		void PrintHostSettings(rpi_settings_host host);
-		void RefreshSettings(std::string setting, std::string choice);  /// both memory and file
+		void RefreshSettings(std::string setting, std::string choice, std::string filename);  /// both memory and file
 		
 		std::vector<rpi_settings_host> all_read_settings; 		// all host settings as read from .conf file
 		std::vector<rpi_settings_host> all_validated_settings; 	// Read settings checked against Discovered hosts
 		
-		ChiakiCodec GetChiakiCodec(std::string choice);
-		ChiakiVideoResolutionPreset GetChiakiResolution(std::string choice);
+		ChiakiCodec GetChiakiCodec(std::string choice, bool isPS5);
+		ChiakiVideoResolutionPreset GetChiakiResolution(std::string choice, bool isPS5);
 		ChiakiVideoFPSPreset GetChiakiFps(std::string choice);
 
 	private:

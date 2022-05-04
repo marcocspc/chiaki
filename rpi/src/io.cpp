@@ -440,7 +440,7 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 	AVCodec *av_codec;
 	
 	const char *codec_name = "h264_v4l2m2m";
-	ChiakiCodec chi_codec = host->gui->settings->GetChiakiCodec(host->session_settings.sess.codec);
+	ChiakiCodec chi_codec = host->gui->settings->GetChiakiCodec(host->session_settings.sess.codec, stoi(host->session_settings.isPS5));
 	if(chi_codec == CHIAKI_CODEC_H265)
 		codec_name = "hevc";
 
@@ -478,7 +478,7 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 	/// Needs to match actual session resolution
 	int width_setting = 1280;
 	int height_setting = 720;
-	ChiakiVideoResolutionPreset resolution_preset = host->gui->settings->GetChiakiResolution(host->session_settings.sess.resolution);
+	ChiakiVideoResolutionPreset resolution_preset = host->gui->settings->GetChiakiResolution(host->session_settings.sess.resolution, stoi(host->session_settings.isPS5));
 	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_1080p) { width_setting=1920; height_setting=1080; }
 	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_720p)  { width_setting=1280; height_setting=720; }
 	if(resolution_preset == CHIAKI_VIDEO_RESOLUTION_PRESET_540p)  { width_setting=960;  height_setting=540; }

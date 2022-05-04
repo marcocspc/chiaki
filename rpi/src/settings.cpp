@@ -5,6 +5,20 @@
 using namespace std;
 
 
+// CHANGE TO INT VECTOR!!!!
+std::vector<std::string> StringIpToVector(std::string ip)
+{
+	std::vector<std::string> out_ip;
+
+	std::istringstream ss(ip);
+	std::string token;
+
+	while(std::getline(ss, token, '.')) {
+		out_ip.push_back(token);
+	}
+
+	return out_ip;
+}
 
 /// char key_bytes_out[16] = {};
 // OLD NOT USED
@@ -119,6 +133,7 @@ void RpiSettings::PrintHostSettings(rpi_settings_host host1)
 			cout << tab2; cout << "isPS5 : " 		<< host1.isPS5 << endl;
 			cout << tab2; cout << "nick : " 		<< host1.nick_name << endl;
 			cout << tab2; cout << "id : " 			<< host1.id << endl;
+			cout << tab2; cout << "remote_ip : " 	<< host1.remote_ip << endl;
 			cout << tab2; cout << "rp_key : " 		<< host1.rp_key << endl;
 			cout << tab2; cout << "regist : " 		<< host1.regist << endl;
 			cout << tab2; cout << "session : " 		<< endl;
@@ -132,7 +147,7 @@ void RpiSettings::PrintHostSettings(rpi_settings_host host1)
 
 // Only works for Single Host ATM
 //setting becomes "decoder" for "automatic" - something carries over
-void RpiSettings::RefreshSettings(std::string setting, std::string choice)
+void RpiSettings::RefreshSettings(std::string setting, std::string choice, std::string filename)
 {
 
 	if(all_validated_settings.size())
@@ -158,8 +173,8 @@ void RpiSettings::RefreshSettings(std::string setting, std::string choice)
 		if(setting =="audio") {
 			all_validated_settings.at(0).sess.audio_device = choice;
 		}
-
-		WriteYaml(all_validated_settings);
+				
+		WriteYaml(all_validated_settings, filename);
 	}
 }
 
@@ -168,21 +183,17 @@ void RpiSettings::RefreshSettings(std::string setting, std::string choice)
 	//~ CHIAKI_CODEC_H265 = 1,
 	//~ CHIAKI_CODEC_H265_HDR = 2
 	//~ } ChiakiCodec;
-ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice)
-{	
-	bool isPS5 = false;
-	if(all_validated_settings.at(0).isPS5 == "1") isPS5 = true;
-		
+ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice, bool isPS5)
+{			
 	if(choice == "automatic" && isPS5)
 		return CHIAKI_CODEC_H265;
 	else if(choice == "automatic")
 		return CHIAKI_CODEC_H264;
-	
+
 	if(choice == "h264") return CHIAKI_CODEC_H264;
-	
+
 	if(choice == "h265" && isPS5) return CHIAKI_CODEC_H265;
 	else return CHIAKI_CODEC_H264;
-	
 }
 
 //~ typedef enum {
@@ -192,15 +203,12 @@ ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice)
 	//~ CHIAKI_VIDEO_RESOLUTION_PRESET_720p = 3,
 	//~ CHIAKI_VIDEO_RESOLUTION_PRESET_1080p = 4
 //~ } ChiakiVideoResolutionPreset;
-ChiakiVideoResolutionPreset RpiSettings::GetChiakiResolution(std::string choice)
-{
-	bool isPS5 = false;
-	if(all_validated_settings.at(0).isPS5 == "1") isPS5 = true;
-	
+ChiakiVideoResolutionPreset RpiSettings::GetChiakiResolution(std::string choice, bool isPS5)
+{	
 	if(choice == "540") return CHIAKI_VIDEO_RESOLUTION_PRESET_540p;
-	
+
 	if(choice == "720") return CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
-	
+
 	if(choice == "1080" && isPS5) return CHIAKI_VIDEO_RESOLUTION_PRESET_1080p;
 	else return CHIAKI_VIDEO_RESOLUTION_PRESET_720p;
 }
@@ -267,6 +275,9 @@ std::vector<rpi_settings_host> RpiSettings::ReadSettingsYaml(std::string filenam
 		ret = GetValueForToken(s, "id");
 		if(ret != "") bufHost.id = ret;
 		
+		ret = GetValueForToken(s, "remote_ip");
+		if(ret != "") bufHost.remote_ip = ret;
+		
 		ret = GetValueForToken(s, "rp_key");
 		if(ret != "") bufHost.rp_key = ret;
 		
@@ -304,21 +315,18 @@ std::vector<rpi_settings_host> RpiSettings::ReadSettingsYaml(std::string filenam
 
 /// not using actual libyaml to write. Seemed too complicated.
 /// re-writing the full file at once from current settings in memory.
-void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
+void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings, std::string filename)
 {	
 	int ret;
-	std::string filename("/home/");
-	filename.append(getenv("USER"));
+	std::string homedir("/home/");
+	homedir.append(getenv("USER"));
 
 	/// check if directories exist, if not - create it
-	filename.append("/.config/Chiaki");
 	struct stat sb;
-	if ( (stat(filename.c_str(), &sb) != 0) || !S_ISDIR(sb.st_mode)) {
-		ret = mkdir(filename.c_str(), 0777);
+	if ( (stat(homedir.c_str(), &sb) != 0) || !S_ISDIR(sb.st_mode)) {
+		ret = mkdir(homedir.c_str(), 0777);
         if(ret)  printf("Error creating .config/Chiaki directory\n");
     }
-
-	filename.append("/Chiaki_rpi.conf");
 		
 	ofstream out(filename);
 	if (!out.is_open()) {
@@ -348,6 +356,7 @@ void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings)
 			out << tab2; out << "isPS5 : " 		<< host1.isPS5 << endl;
 			out << tab2; out << "nick : "		<< host1.nick_name << endl;
 			out << tab2; out << "id : " 		<< host1.id << endl;
+			out << tab2; out << "remote_ip : " 	<< host1.remote_ip << endl;
 			out << tab2; out << "rp_key : "  	<< host1.rp_key << endl;
 			out << tab2; out << "regist : "  	<< host1.regist << endl;
 			out << tab2; out << "session : " 	<< endl;

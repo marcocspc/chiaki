@@ -50,7 +50,7 @@ class Host
 		std::string state = "";  /// standby, unknown, ready etc
 		ChiakiDiscoveryService *service;
 		ChiakiDiscoveryHost *discoveredHosts = nullptr;
-		bool ps5 = false;	/// set by Discovery, not config read (overwrite if Config exists?)
+		bool ps5 = false;	// MUST REMOVE set by Discovery, not config read (overwrite if Config exists?)
 		rpi_settings_host current_remote_settings;
 		rpi_settings_host session_settings;
 

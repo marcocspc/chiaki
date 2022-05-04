@@ -61,7 +61,6 @@ std::vector<std::string> GetFiles(const char* folderPath, const char* match)
     return outFileNames;
 }
 
-
 /// The text blurbs for the info panel.
 const char* ChiakiGetHelpText(int n)
 {
@@ -282,10 +281,10 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	host->Init(io);
 	io->InitGamepads();
 	
-	std::string settingsFile = home_dir;
-	settingsFile.append("/.config/Chiaki/Chiaki_rpi.conf");
+	main_config = home_dir;
+	main_config.append("/.config/Chiaki/Chiaki_rpi.conf");
 	settings = new RpiSettings();
-	settings->all_read_settings = settings->ReadSettingsYaml(settingsFile);
+	settings->all_read_settings = settings->ReadSettingsYaml(main_config);
 	
 	host->StartDiscoveryService();
 
@@ -296,6 +295,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	
 	
 	// settings options - THESE ARE THE ACTUAL SETTINGS SO DON'T CHANGE THE STRINGS.
+	// -----------------------------------------------------------------
 	decoder_options = {"automatic", "v4l2"};  /// "mmal" , doesn't like "-" symbols.
 	sel_decoder = decoder_options[0];
 	
@@ -315,6 +315,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 		audio_options.push_back(out_dev);
 	}
 	sel_audio = audio_options[0];
+	// -----------------------------------------------------------------
 
 
 	/// Setup Platform/Renderer backends
@@ -397,6 +398,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	LoadTextureFromFile(screengrab_name.c_str(), &bg_texture, &ww, &hh);
 	IM_ASSERT(imret);
 
+	/// use the first avalable remote in gui
 	std::string path = std::string(home_dir + "/.config/Chiaki");
 	const char* match = ".remote";
 	remoteHostFiles = GetFiles(path.c_str(), match);
@@ -410,11 +412,19 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 		host->current_remote_settings = tmpRemoteSettings.at(0);
 	} else
 		sel_remote = std::string("no remotes");
-
+	
+	
 	remoteIp[0]=0;
 	remoteIp[1]=0;
 	remoteIp[2]=0;
 	remoteIp[3]=0;
+	std::vector<std::string> ipvec = StringIpToVector(host->current_remote_settings.remote_ip);
+	if(ipvec.at(0) != "0" && ipvec.at(1) != "0") {
+		remoteIp[0]=stoi(ipvec.at(0));
+		remoteIp[1]=stoi(ipvec.at(1));
+		remoteIp[2]=stoi(ipvec.at(2));
+		remoteIp[3]=stoi(ipvec.at(3));
+	}
 	
 	
 	//InitVideoGl(); // not sure if I should keep here
@@ -558,7 +568,7 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 
 refresh:
 	///printf("Refreshing Setting:  %s\n", setting.c_str());
-	settings->RefreshSettings(setting, choice);
+	settings->RefreshSettings(setting, choice, main_config);
 }
 
 /// This is the GUI main loop
@@ -681,14 +691,21 @@ void ImguiSdlWindow::CreateImguiWidgets()
 									for (uint8_t i = 0; i < remoteHostFiles.size(); i++)
 										if (ImGui::Selectable(remoteHostFiles.at(i).c_str() )){
 											sel_remote = remoteHostFiles.at(i);
-											// need to refresh settings in memory (which also writes to file)
-											// ChangeSettingAction(widgetID, select);
+											
 											std::string remoteFile = home_dir;
 											remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
 											RpiSettings tmpsettings;
 											std::vector<rpi_settings_host> tmpRemoteSettings;
 											tmpRemoteSettings = tmpsettings.ReadSettingsYaml(remoteFile);
+											
 											host->current_remote_settings = tmpRemoteSettings.at(0);
+											
+											/// Refresh IP int fields gui
+											std::vector<std::string> ipvec = StringIpToVector(host->current_remote_settings.remote_ip);
+											remoteIp[0]=stoi(ipvec.at(0));
+											remoteIp[1]=stoi(ipvec.at(1));
+											remoteIp[2]=stoi(ipvec.at(2));
+											remoteIp[3]=stoi(ipvec.at(3));
 										}
 									ImGui::EndPopup();
 							}
@@ -703,7 +720,18 @@ void ImguiSdlWindow::CreateImguiWidgets()
 							printf("SDL drm_fd:  %d\n", WMinfo.info.kmsdrm.drm_fd);
 							io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
 							
+							/// Take IP from gui int fields
+							std::string newIP(std::to_string(remoteIp[0]) +"."+ std::to_string(remoteIp[1]) +"."+std::to_string(remoteIp[2]) +"."+std::to_string(remoteIp[3]));
+							host->current_remote_settings.remote_ip = newIP;
 							host->session_settings = host->current_remote_settings;
+										
+							RpiSettings tmpsettings;
+							std::vector<rpi_settings_host> tmpRemoteSettings;
+							tmpRemoteSettings.push_back(host->session_settings);
+							std::string remoteFile = home_dir;
+							remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
+							tmpsettings.WriteYaml(tmpRemoteSettings, remoteFile);
+							
 							io->InitFFmpeg();
 							InitVideoGl();
 							host->StartSession();

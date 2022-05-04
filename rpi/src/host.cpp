@@ -55,11 +55,12 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 			new_host.isPS5 = std::to_string(ps5);
 			new_host.nick_name = dh->host_name;
 			new_host.id = dh->host_id; /// mac
+			new_host.remote_ip = "0.0.0.0"; /// for remotes only
 			new_host.rp_key = rp_key_str;
 			new_host.regist = regist_key;
 			
 			host->gui->settings->all_validated_settings.push_back(new_host);
-			host->gui->settings->WriteYaml(host->gui->settings->all_validated_settings);
+			host->gui->settings->WriteYaml(host->gui->settings->all_validated_settings, std::string(host->gui->home_dir + "/.config/Chiaki/Chiaki_rpi.conf"));
 			
 			// Not correct! Needs to be Discovered's state
 			host->gui->setClientState(std::string("ready"));
@@ -342,13 +343,13 @@ int Host::StartSession()
 	///printf("PS IP addr:  %s\n", connect_info.host);
 	
 	bool isPS5=false;
-	if(gui->settings->all_validated_settings.at(0).isPS5 == "1") isPS5 = true;
+	if(session_settings.isPS5 == "1") isPS5 = true;
 	
 	connect_info.ps5 = isPS5;
 	connect_info.video_profile_auto_downgrade = false;
 	connect_info.enable_keyboard = false;
-	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(session_settings.sess.codec);
-	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(session_settings.sess.resolution);
+	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(session_settings.sess.codec, stoi(session_settings.isPS5));
+	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(session_settings.sess.resolution, stoi(session_settings.isPS5));
 	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(session_settings.sess.fps);
 	chiaki_connect_video_profile_preset(&connect_info.video_profile, resolution_preset, fps_preset);
 	connect_info.video_profile.bitrate = 15000;

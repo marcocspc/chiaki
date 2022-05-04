@@ -113,6 +113,7 @@ class ImguiSdlWindow
 		IO *io = nullptr;	    /// input, decode, rendering, audio
 		RpiSettings *settings = nullptr;
 		std::string home_dir;
+		std::string main_config;
 		
 		
 		bool start();
