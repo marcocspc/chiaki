@@ -52,7 +52,7 @@ class RpiSettings
 		std::vector<rpi_settings_host>  ReadSettingsYaml(std::string filename);	// reads into 'all_host_settings'
 		void WriteYaml(std::vector<rpi_settings_host> all_host_settings, std::string filename);
 		void PrintHostSettings(rpi_settings_host host);
-		void RefreshSettings(std::string setting, std::string choice, std::string filename);  /// both memory and file
+		void RefreshSettings(rpi_settings_host settings_host, std::string setting, std::string choice, std::string filename);  /// both memory and file
 		
 		std::vector<rpi_settings_host> all_read_settings; 		// all host settings as read from .conf file
 		std::vector<rpi_settings_host> all_validated_settings; 	// Read settings checked against Discovered hosts

@@ -145,37 +145,36 @@ void RpiSettings::PrintHostSettings(rpi_settings_host host1)
 
 }
 
-// Only works for Single Host ATM
-//setting becomes "decoder" for "automatic" - something carries over
-void RpiSettings::RefreshSettings(std::string setting, std::string choice, std::string filename)
+// Only works for Single Local Host ATM
+/// Need to add passing the setting struct instead of all_validated_settings
+void RpiSettings::RefreshSettings(rpi_settings_host settings_host, std::string setting, std::string choice, std::string filename)
 {
-
-	if(all_validated_settings.size())
-	{
 		printf("Refreshing:  %s : %s\n", setting.c_str(), choice.c_str());
 	
 		if(setting == "decoder") {
-			all_validated_settings.at(0).sess.decoder = choice;
+			settings_host.sess.decoder = choice;
 		}
 
 		if(setting =="codec") {
-			all_validated_settings.at(0).sess.codec = choice;
+			settings_host.sess.codec = choice;
 		}
 
 		if(setting =="resolution") {
-			all_validated_settings.at(0).sess.resolution = choice;
+			settings_host.sess.resolution = choice;
 		}
 
 		if(setting =="fps") {
-			all_validated_settings.at(0).sess.fps = choice;
+			settings_host.sess.fps = choice;
 		}
 
 		if(setting =="audio") {
-			all_validated_settings.at(0).sess.audio_device = choice;
+			settings_host.sess.audio_device = choice;
 		}
-				
-		WriteYaml(all_validated_settings, filename);
-	}
+		
+		/// also write to file
+		std::vector<rpi_settings_host> tmpSet;
+		tmpSet.push_back(settings_host);
+		WriteYaml(tmpSet, filename);
 }
 
 	// values must not change
@@ -230,11 +229,7 @@ ChiakiVideoFPSPreset RpiSettings::GetChiakiFps(std::string choice)
 /// Does not yet handle multiple hosts
 std::vector<rpi_settings_host> RpiSettings::ReadSettingsYaml(std::string filename)
 {	
-	//~ std::string filename("/home/");
-	//~ filename.append(getenv("USER"));
-	//~ filename.append("/.config/Chiaki/Chiaki_rpi.conf");
 	std::vector<std::string> in_strings;
-	
 	std::vector<rpi_settings_host> out_hosts_settings;
 	
 	printf("Will try to read rpi settings file: %s\n", filename.c_str());	
@@ -370,7 +365,7 @@ void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings, st
 	/// Finish
 	out.flush();
 	out.close();
-	printf("Wrote yaml file\n");
+	printf("Wrote yaml file %s\n", filename.c_str());
 }
 
 

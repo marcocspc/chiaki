@@ -61,6 +61,7 @@ std::vector<std::string> GetFiles(const char* folderPath, const char* match)
     return outFileNames;
 }
 
+
 /// The text blurbs for the info panel.
 const char* ChiakiGetHelpText(int n)
 {
@@ -268,7 +269,6 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	printf("Running under X11: %d\n", IsX11);
 	
 	/// establish user home dir
-	//std::string screengrab_name("/home/");
 	home_dir = std::string("/home/");
 	home_dir.append(getenv("USER"));
 
@@ -285,6 +285,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	main_config.append("/.config/Chiaki/Chiaki_rpi.conf");
 	settings = new RpiSettings();
 	settings->all_read_settings = settings->ReadSettingsYaml(main_config);
+	gui_settings_ptr = &settings->all_read_settings.at(0);	/// just to have some refrence connected
 	
 	host->StartDiscoveryService();
 
@@ -296,7 +297,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	
 	// settings options - THESE ARE THE ACTUAL SETTINGS SO DON'T CHANGE THE STRINGS.
 	// -----------------------------------------------------------------
-	decoder_options = {"automatic", "v4l2"};  /// "mmal" , doesn't like "-" symbols.
+	decoder_options = {"automatic", "v4l2"};  /// doesn't like "-" symbols.
 	sel_decoder = decoder_options[0];
 	
 	vcodec_options =  {"automatic", "h264", "h265"};
@@ -351,6 +352,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	ImGuiIO &imio = ImGui::GetIO();
 	float size_pixels = 18;
 	imgui_font = imio.Fonts->AddFontFromFileTTF(std::string(mainpath+"komika.slick.ttf").c_str(), size_pixels);
+	bigger_font = imio.Fonts->AddFontFromFileTTF(std::string(mainpath+"komika.slick.ttf").c_str(), size_pixels*1.5);
 	regist_font = imio.Fonts->AddFontFromFileTTF(std::string(mainpath+"Cousine-Regular.ttf").c_str(), size_pixels);
 
 	/// Textures for buttons, bg etc
@@ -386,6 +388,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 
 
 	SwitchHostImage(0); /// to 'unknown' as default start
+	remote_texture = gui_textures[0];
 
 	std::string tx7 = mainpath + "logo_01.png";
 	LoadTextureFromFile(tx7.c_str(), &logo_texture, &logo_width, &logo_height);
@@ -418,7 +421,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	remoteIp[1]=0;
 	remoteIp[2]=0;
 	remoteIp[3]=0;
-	/// protect for old files
+	/// protect for old settings files
 	std::vector<std::string> ipvec = StringIpToVector(host->current_remote_settings.remote_ip);
 	if(ipvec.size() != 0 && ipvec.at(0) != "0" && ipvec.at(1) != "0") {
 		remoteIp[0]=stoi(ipvec.at(0));
@@ -427,6 +430,8 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 		remoteIp[3]=stoi(ipvec.at(3));
 	}
 	
+	time(&timestamp_sec_a); 
+	timestamp_sec_a -= 11; /// substract 11 sec to enable at startup
 	
 	//InitVideoGl(); // not sure if I should keep here
 	
@@ -478,8 +483,27 @@ void ImguiSdlWindow::SettingsDraw(int widgetID, const char* label, std::vector<s
 
 ///
 void ImguiSdlWindow::SwitchHostImage(int which)
-{
+{	
 	current_host_texture = gui_textures[which];
+}
+
+
+void ImguiSdlWindow::SwitchRemoteImage(std::string state, int isPS5)
+{
+	if(isPS5) {
+		
+		if(state == std::string("standby"))
+			remote_texture = gui_textures[5];
+		if(state == std::string("ready"))
+			remote_texture = gui_textures[6];
+		
+	} else {
+		
+		if(state == std::string("standby"))
+			remote_texture = gui_textures[2];
+		if(state == std::string("ready"))
+			remote_texture = gui_textures[3];
+	}	
 }
 
 
@@ -508,17 +532,42 @@ void ImguiSdlWindow::SwitchHelpText(const char* label)
 	}	
 }
 
+
+/// triggers when host an icon is hovered/focused
+// must trigger gui refresh
+void ImguiSdlWindow::SwitchSettings(int id)
+{	
+	/// do something only on change
+	if(currentSettingsId != id) {
+		currentSettingsId = id;
+		
+		if(currentSettingsId == 20) {	/// local host 0
+			gui_settings_ptr = &settings->all_validated_settings.at(0);
+			UpdateSettingsGui();
+			///printf("Switched to Local Settings\n");
+		}
+		if(currentSettingsId == 21) {	/// remote host 0
+			gui_settings_ptr = &host->current_remote_settings;
+			UpdateSettingsGui();
+			///printf("Switched to Remote Settings\n");
+		}		
+	}
+	
+	///printf("apa");
+}
+
+
 /// changes what's seen in the gui
 void ImguiSdlWindow::UpdateSettingsGui()
 {
-	sel_decoder = settings->all_validated_settings.at(0).sess.decoder;
-	sel_vcodec = settings->all_validated_settings.at(0).sess.codec;
-	sel_resolution = settings->all_validated_settings.at(0).sess.resolution;
-	sel_framerate = settings->all_validated_settings.at(0).sess.fps;
-	sel_audio = settings->all_validated_settings.at(0).sess.audio_device;
+	sel_decoder = gui_settings_ptr->sess.decoder;
+	sel_vcodec = gui_settings_ptr->sess.codec;
+	sel_resolution = gui_settings_ptr->sess.resolution;
+	sel_framerate = gui_settings_ptr->sess.fps;
+	sel_audio = gui_settings_ptr->sess.audio_device;
 }
 
-/// triggers on each settings gui change
+/// triggers on each settings gui change - Writes to settings file
 ///decoder, codec, resolution, fps, audio 
 void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 {	
@@ -528,6 +577,7 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 	for(std::string ch : decoder_options) {
 		if(choice == ch) {
 			setting = "decoder";
+			gui_settings_ptr->sess.decoder = choice;
 			goto refresh;
 		}
 	}
@@ -536,6 +586,7 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 	for(std::string ch : vcodec_options) {
 		if(choice == ch) {
 			setting = "codec";
+			gui_settings_ptr->sess.codec = choice;
 			goto refresh;
 		}
 	}
@@ -544,6 +595,7 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 	for(std::string ch : resolution_options) {
 		if(choice == ch) {
 			setting = "resolution";
+			gui_settings_ptr->sess.resolution = choice;
 			goto refresh;
 		}
 	}
@@ -552,6 +604,7 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 	for(std::string ch : framerate_options) {
 		if(choice == ch) {
 			setting = "fps";
+			gui_settings_ptr->sess.fps = choice;
 			goto refresh;
 		}
 	}
@@ -560,6 +613,7 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 	for(std::string ch : audio_options) {
 		if(choice == ch) {
 			setting = "audio";
+			gui_settings_ptr->sess.audio_device = choice;
 			goto refresh;
 		}
 	}	
@@ -568,9 +622,29 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 	
 
 refresh:
-	///printf("Refreshing Setting:  %s\n", setting.c_str());
-	settings->RefreshSettings(setting, choice, main_config);
+	std::string config_file;
+	if(currentSettingsId == 20) {	/// is Local
+		//settings->all_validated_settings.at(0) = *gui_settings_ptr;//
+		config_file = main_config;
+	} else {
+		//host->current_remote_settings = *gui_settings_ptr;//
+		config_file = home_dir;
+		config_file.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
+	}
+	
+	settings->RefreshSettings(*gui_settings_ptr, setting, choice, config_file);
 }
+
+
+std::string ImguiSdlWindow::GetIpAddr()
+{
+	std::string out_ip("0.0.0.0");
+	out_ip = (std::to_string(remoteIp[0]) +"."+ std::to_string(remoteIp[1]) +"."+std::to_string(remoteIp[2]) +"."+std::to_string(remoteIp[3]));
+	
+	return out_ip;
+}
+
+
 
 /// This is the GUI main loop
 ///
@@ -626,6 +700,12 @@ bool ImguiSdlWindow::start()
 
 void ImguiSdlWindow::CreateImguiWidgets()
 {			
+			time_t timestamp_sec_b;
+			time(&timestamp_sec_b);
+			long unsigned int timelapsed = timestamp_sec_b - timestamp_sec_a;
+			///printf("Lapsed:  %ld\n", timestamp_sec_a);
+			
+	
 			// try move these out
 			ImGuiIO &imio = ImGui::GetIO();
 			imio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     /// Enable Keyboard Controls
@@ -640,6 +720,7 @@ void ImguiSdlWindow::CreateImguiWidgets()
 			window_flags |= ImGuiWindowFlags_NoCollapse;
 			///window_flags |= ImGuiWindowFlags_NoBackground;
 			window_flags |= ImGuiWindowFlags_NoResize;
+			window_flags |= ImGuiWindowFlags_NoMouseInputs;
 						
 			dspszX = imio.DisplaySize.x;
 			dspszY = imio.DisplaySize.y;
@@ -674,11 +755,11 @@ void ImguiSdlWindow::CreateImguiWidgets()
 					ImGui::BeginChild("A", ImVec2(subPanelSzX, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
 						//ImGui::Dummy(ImVec2(0, (subPanelSzYtop/2)-(20/2)) );  /// add offset space at top
 						
-						/// gui for remote connections
+						/// Gui for Remote connections
+						///	
 						ImGui::PushItemWidth(160.0f);   
-						ImGui::InputInt4("IPv4", remoteIp);
+						ImGui::InputInt4(" ", remoteIp);
 						ImGui::PopItemWidth();
-						///printf("INT:  %d\n", remoteIp[3]);
 
 						const char* lbl="RemoteHost";
 						if(ImGui::Button(sel_remote.c_str(), ImVec2(160, 30) )){
@@ -709,43 +790,70 @@ void ImguiSdlWindow::CreateImguiWidgets()
 												remoteIp[2]=stoi(ipvec.at(2));
 												remoteIp[3]=stoi(ipvec.at(3));
 											}
+											/// revert
+											host->discoveredRemoteMatched = false;
+											currentSettingsId = 20; /// back to local
+											UpdateSettingsGui();	/// back to local
 										}
 									ImGui::EndPopup();
 							}
 						}
-						if (ImGui::Button("Wake Up", ImVec2(160, 30))) {}
 						
-						if (ImGui::Button("Connect", ImVec2(160, 30))) {
-							
-							SDL_SysWMinfo WMinfo;
-							SDL_VERSION(&WMinfo.version);
-							SDL_GetWindowWMInfo(sdl_window, &WMinfo);
-							printf("SDL drm_fd:  %d\n", WMinfo.info.kmsdrm.drm_fd);
-							io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
-							
-							/// Take IP from gui int fields
-							std::string newIP(std::to_string(remoteIp[0]) +"."+ std::to_string(remoteIp[1]) +"."+std::to_string(remoteIp[2]) +"."+std::to_string(remoteIp[3]));
-							host->current_remote_settings.remote_ip = newIP;
-							host->session_settings = host->current_remote_settings;
-										
-							RpiSettings tmpsettings;
-							std::vector<rpi_settings_host> tmpRemoteSettings;
-							tmpRemoteSettings.push_back(host->session_settings);
-							std::string remoteFile = home_dir;
-							remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
-							tmpsettings.WriteYaml(tmpRemoteSettings, remoteFile);
-							
-							io->InitFFmpeg();
-							InitVideoGl();
-							host->StartSession();
-							guiActive = 0;
-							io->SwitchInputReceiver(std::string("session"));
-							setClientState("playing");
+						if(timelapsed > 10) {
+							if (ImGui::Button("Find Remote", ImVec2(160, 30))) {
+									
+									host->discoveredRemoteMatched = false;
+									host->DiscoverRemote();
+									
+									/// all this to save current gui IP
+									host->current_remote_settings.remote_ip = GetIpAddr();
+									RpiSettings tmpsettings;
+									std::vector<rpi_settings_host> tmpRemoteSettings;
+									tmpRemoteSettings.push_back(host->current_remote_settings);
+									std::string remoteFile = home_dir;
+									remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
+									tmpsettings.WriteYaml(tmpRemoteSettings, remoteFile);
+							}
+						} else {
+							std::string waittxt("   Please Wait ");
+							waittxt.append(std::to_string(10-timelapsed));
+							ImGui::Text(waittxt.c_str());
 						}
 						
-
+						if(host->discoveredRemoteMatched) {
+							if (ImGui::ImageButton((void*)(intptr_t)remote_texture, ImVec2(100, 100), ImVec2(0, 0), ImVec2(1, 1), 2) )    // <0 frame_padding uses default frame padding settings. 0 for no padding
+							{
+								if(host->remote_state == std::string("standby"))
+								{
+									host->WakeupRemote();
+									timestamp_sec_a = timestamp_sec_b;
+								}
+								if(host->remote_state == std::string("ready"))
+								{
+									SDL_SysWMinfo WMinfo;
+									SDL_VERSION(&WMinfo.version);
+									SDL_GetWindowWMInfo(sdl_window, &WMinfo);
+									printf("SDL drm_fd:  %d\n", WMinfo.info.kmsdrm.drm_fd);
+									io->drm_fd = WMinfo.info.kmsdrm.drm_fd;
+									
+									host->current_remote_settings.remote_ip = GetIpAddr();
+									host->session_settings = host->current_remote_settings;
+									
+									/// session startup
+									io->InitFFmpeg();
+									if(IsX11) InitVideoGl();
+									host->StartSession();
+									guiActive = 0;
+									io->SwitchInputReceiver(std::string("session"));
+									setClientState("playing");
+								}
+							}
+							if (ImGui::IsItemHovered()) SwitchSettings(21);
+							
+						}
 					ImGui::EndChild();
-				
+					
+					/// Local Playstation host
 					ImGui::SameLine();
 					ImGui::BeginChild("B", ImVec2(subPanelSzX, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
 						ImGui::Dummy(ImVec2(0, (subPanelSzYtop/2)-(psBtnSz/2)) );  /// add offset space at top
@@ -755,10 +863,11 @@ void ImguiSdlWindow::CreateImguiWidgets()
 						{
 							hostClick();
 						}
+						if (ImGui::IsItemHovered()) SwitchSettings(20);
 						ImGui::Text(client_state.c_str());
 					ImGui::EndChild();
 
-
+					/// Quit button
 					ImGui::SameLine();
 					ImGui::BeginChild("C", ImVec2(subPanelSzX, subPanelSzYtop), false, ImGuiWindowFlags_NavFlattened);
 						ImGui::Dummy(ImVec2(0, (subPanelSzYtop/2)-(20/2)) );  /// add offset space at top
@@ -829,7 +938,16 @@ void ImguiSdlWindow::CreateImguiWidgets()
 					/// Settings popup buttons
 					ImGui::BeginChild("SettingsPanel", ImVec2(subPanelSzX, subPanelSzYbot), false, ImGuiWindowFlags_NavFlattened);
 						
-						ImGui::Dummy(ImVec2(100, 60));
+						ImGui::Indent(subPanelSzX/4);
+						ImGui::PushFont(bigger_font);
+						if(currentSettingsId == 20)
+							ImGui::Text("LOCAL Settings");
+						else ImGui::Text("REMOTE Settings");
+						ImGui::PopFont();
+						ImGui::Indent(-subPanelSzX/4);
+						
+						ImGui::Dummy(ImVec2(100, 30));
+						
 						SettingsDraw(1, "Video Decoder", decoder_options, sel_decoder);
 
 						SettingsDraw(2, "Video Codec", vcodec_options, sel_vcodec);

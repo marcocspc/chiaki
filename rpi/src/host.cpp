@@ -2,15 +2,14 @@
 #include <string>
 #include <iostream>	/// to_string()
 
+#include <netdb.h>
+//#include <stdio.h>
+#include <netinet/in.h>
+
 #include <rpi/host.h>
 #include "rpi/settings.h"
 
 #include <chiaki/base64.h> //move to .h
-
-/// Notes:
-/// # sudo chmod a+rw /dev/dma_heap/*
-/// Try:  gpu=96(config.txt), cma=64M(cmdline.txt)
-///  or   gpu=256, cma=128
 
 #define PING_MS		500
 #define DROP_PINGS	3
@@ -72,6 +71,63 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 	//chiaki_regist_fini(&gui->regist);
 }
 
+
+static void rem_discovery_cb(ChiakiDiscoveryHost *discovery_host, void *user)
+{
+	Host* host = (Host*)user;
+	
+	host->remote_state = chiaki_discovery_host_state_string(discovery_host->state);
+	/// printf("Discovered remote is:  %s\n", host->remote_state.c_str());
+	
+	//~ if(host->system_version)
+		//~ CHIAKI_LOGI(log, "System Version:                    %s", host->system_version);
+
+	//~ if(host->device_discovery_protocol_version)
+		//~ CHIAKI_LOGI(log, "Device Discovery Protocol Version: %s", host->device_discovery_protocol_version);
+
+	//~ if(host->host_request_port)
+		//~ CHIAKI_LOGI(log, "Request Port:                      %hu", (unsigned short)host->host_request_port);
+
+	host->discovered_remote.nick_name = std::string(discovery_host->host_name);
+	
+	std::string isPS5("0");
+	if(discovery_host->host_type == std::string("PS5")) isPS5 = "1";
+	host->discovered_remote.isPS5 = isPS5;
+	int isPS5_ = stoi(isPS5);
+
+	host->discovered_remote.id = discovery_host->host_id;
+
+	//~ if(host->running_app_titleid)
+		//~ CHIAKI_LOGI(log, "Running App Title ID:              %s", host->running_app_titleid);
+
+	//~ if(host->running_app_name)
+		//~ CHIAKI_LOGI(log, "Running App Name:                  %s%s", host->running_app_name, (strcmp(host->running_app_name, "Persona 5") == 0 ? " (best game ever)" : ""));
+
+	/// Compare ID with all .remote files
+	if(host->gui->remoteHostFiles.size() > 0)
+	{
+		for (uint8_t i = 0; i < host->gui->remoteHostFiles.size(); i++) 
+		{
+			std::string sel_remote = host->gui->remoteHostFiles.at(i);
+			std::string remoteFile = host->gui->home_dir;
+			remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
+			RpiSettings tmpsettings;
+			std::vector<rpi_settings_host> tmpRemoteSettings;
+			tmpRemoteSettings = tmpsettings.ReadSettingsYaml(remoteFile);
+			
+			/// now compare with the discovered remote from above
+			if(host->discovered_remote.id == tmpRemoteSettings.at(0).id)  /// found/matched!
+			{
+				host->discoveredRemoteMatched = true;
+				host->gui->SwitchRemoteImage(host->remote_state, isPS5_);
+			}
+		}
+	}
+	
+	printf("Remote Discovery Callback\n");
+}
+
+
 // Can I make the ConnectionEventCB into this instead to save recursion?
 static void EventCB(ChiakiEvent *event, void *user);
 static void EventCB(ChiakiEvent *event, void *user)
@@ -101,7 +157,7 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 	printf("Discovered Host State:  %s\n", host->state.c_str());
 
 	host->ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(discovered_hosts));
-	printf("Is PS5:  %d\n", host->ps5);
+	//printf("Is PS5:  %d\n", host->ps5);
 
 	/// If read settings are empty (so nothing was read from file earlier)
 	/// [N]
@@ -229,9 +285,6 @@ int Host::StartDiscoveryService()
 	options.cb = Discovery;		// type  ChiakiDiscoveryServiceCb
 	options.cb_user = this;		/// the Host
 	
-	
-	
-	//ORIG ChiakiDiscoveryService *service = new ChiakiDiscoveryService;
 	service = new ChiakiDiscoveryService;
 	///from discoverymanager
 	sockaddr_in addr = {};
@@ -254,6 +307,103 @@ int Host::StartDiscoveryService()
 	printf("Discovery Service started\n");
 	return 0;
 }
+
+
+int Host::DiscoverRemote()
+{
+	/// const char *host;
+	const char *host = gui->GetIpAddr().c_str();
+
+	ChiakiDiscovery discovery;
+	ChiakiErrorCode err = chiaki_discovery_init(&discovery, &log, AF_INET); // TODO: IPv6
+	if(err != CHIAKI_ERR_SUCCESS)
+	{
+		printf("Discovery init failed\n");
+		return 1;
+	}
+
+	ChiakiDiscoveryThread thread;
+	err = chiaki_discovery_thread_start(&thread, &discovery, rem_discovery_cb, this);//last was NULL
+	if(err != CHIAKI_ERR_SUCCESS)
+	{
+		printf("Discovery thread init failed\n");
+		chiaki_discovery_fini(&discovery);
+		return 1;
+	}
+
+	struct addrinfo *host_addrinfos;
+	///int r = getaddrinfo(arguments.host, NULL, NULL, &host_addrinfos);
+	int r = getaddrinfo(host, NULL, NULL, &host_addrinfos);
+	if(r != 0)
+	{
+		printf("getaddrinfo failed\n");
+		return 1;
+	}
+
+	struct sockaddr *host_addr = NULL;
+	socklen_t host_addr_len = 0;
+	for(struct addrinfo *ai=host_addrinfos; ai; ai=ai->ai_next)
+	{
+		if(ai->ai_protocol != IPPROTO_UDP)
+			continue;
+		if(ai->ai_family != AF_INET) // TODO: IPv6
+			continue;
+
+		host_addr_len = ai->ai_addrlen;
+		host_addr = (struct sockaddr *)malloc(host_addr_len);
+		if(!host_addr)
+			break;
+		memcpy(host_addr, ai->ai_addr, host_addr_len);
+	}
+	freeaddrinfo(host_addrinfos);
+
+	if(!host_addr)
+	{
+		printf("Failed to get addr for hostname\n");
+		return 1;
+	}
+
+	ChiakiDiscoveryPacket packet;
+	memset(&packet, 0, sizeof(packet));
+	packet.cmd = CHIAKI_DISCOVERY_CMD_SRCH;
+	packet.protocol_version = CHIAKI_DISCOVERY_PROTOCOL_VERSION_PS4;
+	((struct sockaddr_in *)host_addr)->sin_port = htons(CHIAKI_DISCOVERY_PORT_PS4);
+	err = chiaki_discovery_send(&discovery, &packet, host_addr, host_addr_len);
+	if(err != CHIAKI_ERR_SUCCESS)
+		printf("Failed to send discovery packet for PS4\n");
+		
+	packet.protocol_version = CHIAKI_DISCOVERY_PROTOCOL_VERSION_PS5;
+	((struct sockaddr_in *)host_addr)->sin_port = htons(CHIAKI_DISCOVERY_PORT_PS5);
+	err = chiaki_discovery_send(&discovery, &packet, host_addr, host_addr_len);
+	if(err != CHIAKI_ERR_SUCCESS)
+		printf("Failed to send discovery packet for PS5\n");
+		
+	sleep(1); /// work around is threading I guess
+	
+	printf("DiscoverRemote ran\n");
+	return 0;
+}
+
+
+//~ void CheckSomething(unsigned int* count);
+//~ void CheckSomething(unsigned int* count)
+//~ {
+	//~ //Host* host = (Host*)user;
+//~ }
+
+
+int Host::WakeupRemote()
+{
+	const char *host_ip = gui->GetIpAddr().c_str();
+	int isPS5 = stoi(discovered_remote.isPS5);
+	uint64_t credential = (uint64_t)strtoull(current_remote_settings.regist.c_str(), NULL, 16);
+	
+	chiaki_discovery_wakeup(&log, NULL, host_ip, credential, isPS5);
+	discoveredRemoteMatched = false;
+
+	return 0;
+}
+
 
 // will need number for which discoveredHost
 void Host::RegistStart(std::string accountID, std::string pin)
@@ -328,7 +478,7 @@ int Host::StartSession()
 	strncpy(out2, session_settings.regist.c_str(), stringlen);
 	
 	memcpy(&connect_info.regist_key, out2, CHIAKI_SESSION_AUTH_SIZE);
-	printf("Regist for session:%sEND\n", connect_info.regist_key);
+	/// printf("Regist for session:%sEND\n", connect_info.regist_key);
 
 	uint8_t rp_key[0x10] = {0};
 	size_t rp_key_sz = sizeof(rp_key);
@@ -338,8 +488,7 @@ int Host::StartSession()
 		rp_key, &rp_key_sz);
 	memcpy(&connect_info.morning, rp_key, rp_key_sz);
 	///printf("Rp Key:%sEND\n", connect_info.morning);
-	
-	//connect_info.host = discoveredHosts->host_addr;
+
 	connect_info.host = session_settings.remote_ip.c_str();
 	///printf("PS IP addr:  %s\n", connect_info.host);
 	
@@ -375,7 +524,7 @@ int Host::StartSession()
 		CHIAKI_LOGE(&log, "Session start failed: %s\n", chiaki_error_string(err));
 		return 1;
 	}
-	printf("Session Bitrate:  %d\n", session.connect_info.video_profile.bitrate);
+	///printf("Session Bitrate:  %d\n", session.connect_info.video_profile.bitrate);
 	///printf("Session target:  %d\n", session.target);
 
 	chiaki_session_set_event_cb(&session, EventCB, this);

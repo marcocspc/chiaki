@@ -51,8 +51,14 @@ class Host
 		ChiakiDiscoveryService *service;
 		ChiakiDiscoveryHost *discoveredHosts = nullptr;
 		bool ps5 = false;	// MUST REMOVE set by Discovery, not config read (overwrite if Config exists?)
-		rpi_settings_host current_remote_settings;
 		rpi_settings_host session_settings;
+		
+		/// Remotes
+		rpi_settings_host current_remote_settings;
+		rpi_settings_host discovered_remote;
+		std::string remote_state = "";  /// standby, unknown, ready etc
+		bool discoveredRemoteMatched = false;
+		unsigned int testCount=0; // should be in Gui no?
 
 		ChiakiThread play_th;
 		
@@ -60,6 +66,8 @@ class Host
 		~Host();
 		int Init(IO *io);
 		int StartDiscoveryService();
+		int DiscoverRemote();
+		int WakeupRemote();
 		void RegistStart(std::string accountID, std::string pin);
 		void SendWakeup();
 		int StartSession();

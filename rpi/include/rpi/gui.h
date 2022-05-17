@@ -10,7 +10,7 @@
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
 
-// version error
+// version error - fixed in newer versions if Imgui
 // /home/pi/dev/chiaki_v4l2/third-party/imgui/imgui_internal.h:267:25: error: missing binary operator before token "defined"
 //  #elif defined(__GNUC__) defined(__arm__) && !defined(__thumb__)
 // should be
@@ -18,6 +18,7 @@
 
 #include <string>
 #include <stdio.h>
+#include <time.h>
 
 #include <libavcodec/avcodec.h> ///AVFrame
 
@@ -129,12 +130,15 @@ class ImguiSdlWindow
 		void UpdateSettingsGui();
 		void ChangeSettingAction(int widgetID, std::string choice);
 		void SwitchHelpText(const char* label);
+		void SwitchSettings(int id);
 		void HandleSDLEvents();
 		void ToggleFullscreen();
+		std::string GetIpAddr();
 		
 		/// Imgui things
 		void SettingsDraw(int widgetID, const char* label, std::vector<std::string> list, std::string &select);
 		void SwitchHostImage(int which);
+		void SwitchRemoteImage(std::string state, int isPS5);
 		
 		std::vector<std::string>  remoteHostFiles;
 		std::string sel_remote;
@@ -156,11 +160,14 @@ class ImguiSdlWindow
 		///ImColor neon_yell = ImColor(200, 255, 0, 255);
 		ImFont* imgui_font;
 		ImFont* regist_font;
+		ImFont* bigger_font;
 		int help_text_n = 0;
 		int psBtnSz = 256;
 		int dspszX = 0;
 		int dspszY = 0;
 		int settingIndent = 0;
+		int currentSettingsId = 20;	/// 20=local, 21=remote
+		rpi_settings_host *gui_settings_ptr;
 		
 		bool open_regist = false;
 		std::string regist_acc_id;
@@ -176,11 +183,12 @@ class ImguiSdlWindow
 		bool IsX11 = false;
 		bool takeInput=1;
 		int clear_counter = 0;
-		
+		time_t timestamp_sec_a;
 		
 		/// textures for gui
 		GLuint gui_textures[16] = {(GLuint)0};
 		GLuint current_host_texture = 0;
+		GLuint remote_texture = 0;
 		GLuint bg_texture;
 		GLuint logo_texture;
 		int logo_width = 0;
