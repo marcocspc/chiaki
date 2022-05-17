@@ -301,7 +301,7 @@ std::vector<rpi_settings_host> RpiSettings::ReadSettingsYaml(std::string filenam
 		printf("Found settings for %d host(s)\n", n_hosts);
 	}
 	
-	PrintHostSettings(bufHost);
+	///PrintHostSettings(bufHost);
 	
 	/// Finish
 	

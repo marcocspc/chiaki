@@ -624,7 +624,7 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 refresh:
 	std::string config_file;
 	if(currentSettingsId == 20) {	/// is Local
-		//settings->all_validated_settings.at(0) = *gui_settings_ptr;//
+		//settings->all_validated_settings.at(0) = *gui_settings_ptr;//what bug was caused?
 		config_file = main_config;
 	} else {
 		//host->current_remote_settings = *gui_settings_ptr;//
@@ -792,8 +792,8 @@ void ImguiSdlWindow::CreateImguiWidgets()
 											}
 											/// revert
 											host->discoveredRemoteMatched = false;
-											currentSettingsId = 20; /// back to local
-											UpdateSettingsGui();	/// back to local
+											//currentSettingsId = 20; /// back to local
+											//UpdateSettingsGui();	/// back to local
 										}
 									ImGui::EndPopup();
 							}
