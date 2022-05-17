@@ -533,6 +533,16 @@ void ImguiSdlWindow::SwitchHelpText(const char* label)
 }
 
 
+void ImguiSdlWindow::RefreshReadBg()
+{
+	std::string screengrab_name = home_dir;
+	screengrab_name.append("/.config/Chiaki/screengrab.jpg");
+	int ww, hh;
+	bool imret = LoadTextureFromFile(screengrab_name.c_str(), &bg_texture, &ww, &hh);
+	IM_ASSERT(imret);
+}
+
+
 /// triggers when host an icon is hovered/focused
 // must trigger gui refresh
 void ImguiSdlWindow::SwitchSettings(int id)
@@ -729,20 +739,24 @@ void ImguiSdlWindow::CreateImguiWidgets()
 			int subPanelSzX = (dspszX*0.9) / 3;
 			int subPanelSzYtop = (dspszY*0.9) * (1.0-botHgt) - 20;  /// the -20 is fudge
 			int subPanelSzYbot = (dspszY*0.9) * botHgt;
+			int center_win_alpha = 64;
 			
 			/// BG Window for textured backdrop
-			ImGui::SetNextWindowSize(ImVec2((int)dspszX+8, (int)dspszY+8), ImGuiCond_Always);
-			ImGui::SetNextWindowPos(ImVec2((int)-4, (int)-4), ImGuiCond_Always);
-			bool* b_open = new bool;
-			ImGui::Begin("BG Window", b_open, window_flags|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoMouseInputs);
-			ImDrawList* draw_listA = ImGui::GetWindowDrawList();
-			draw_listA->AddImage((void*)(intptr_t)bg_texture, ImVec2(0, 0), ImVec2(dspszX, dspszY) );
-			ImGui::End();
+			if(bg_texture != 0) {
+				center_win_alpha = 128;
+				ImGui::SetNextWindowSize(ImVec2((int)dspszX+8, (int)dspszY+8), ImGuiCond_Always);
+				ImGui::SetNextWindowPos(ImVec2((int)-4, (int)-4), ImGuiCond_Always);
+				bool* b_open = new bool;
+				ImGui::Begin("BG Window", b_open, window_flags|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoMouseInputs);
+				ImDrawList* draw_listA = ImGui::GetWindowDrawList();
+				draw_listA->AddImage((void*)(intptr_t)bg_texture, ImVec2(0, 0), ImVec2(dspszX, dspszY) );
+				ImGui::End();
+			}
 			
 			ImGui::SetNextWindowSize(ImVec2((int)imio.DisplaySize.x*0.9, (int)imio.DisplaySize.y*0.9), ImGuiCond_Always);
 			ImGui::SetNextWindowPos(ImVec2((int)imio.DisplaySize.x*0.05, (int)imio.DisplaySize.y*0.05), ImGuiCond_Always);
-			ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(ImColor((int)clear_color.x, (int)clear_color.y, (int)clear_color.z, 128)));
-			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(ImColor((int)clear_color.x, (int)clear_color.y, (int)clear_color.z, 64)));
+			ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(ImColor((int)clear_color.x, (int)clear_color.y, (int)clear_color.z, center_win_alpha)));
+			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(ImColor((int)clear_color.x, (int)clear_color.y, (int)clear_color.z, 0)));
 
 			bool* p_open = new bool;
 			if (ImGui::Begin("Parent Window", p_open, window_flags) )
@@ -757,6 +771,9 @@ void ImguiSdlWindow::CreateImguiWidgets()
 						
 						/// Gui for Remote connections
 						///	
+						ImGui::BeginGroup();
+						ImGui::Indent(40);
+						ImGui::Dummy(ImVec2(0, subPanelSzYtop/3) );
 						ImGui::PushItemWidth(160.0f);   
 						ImGui::InputInt4(" ", remoteIp);
 						ImGui::PopItemWidth();
@@ -815,13 +832,17 @@ void ImguiSdlWindow::CreateImguiWidgets()
 									tmpsettings.WriteYaml(tmpRemoteSettings, remoteFile);
 							}
 						} else {
-							std::string waittxt("   Please Wait ");
+							std::string waittxt("    Please Wait ");
 							waittxt.append(std::to_string(10-timelapsed));
 							ImGui::Text(waittxt.c_str());
 						}
+						ImGui::EndGroup();
 						
+						ImGui::SameLine();
+						ImGui::BeginGroup();
+						ImGui::Dummy(ImVec2(0, (subPanelSzYtop/3)-10) );
 						if(host->discoveredRemoteMatched) {
-							if (ImGui::ImageButton((void*)(intptr_t)remote_texture, ImVec2(100, 100), ImVec2(0, 0), ImVec2(1, 1), 2) )    // <0 frame_padding uses default frame padding settings. 0 for no padding
+							if (ImGui::ImageButton((void*)(intptr_t)remote_texture, ImVec2(120, 120), ImVec2(0, 0), ImVec2(1, 1), 2) )    // <0 frame_padding uses default frame padding settings. 0 for no padding
 							{
 								if(host->remote_state == std::string("standby"))
 								{
@@ -851,6 +872,7 @@ void ImguiSdlWindow::CreateImguiWidgets()
 							if (ImGui::IsItemHovered()) SwitchSettings(21);
 							
 						}
+						ImGui::EndGroup();
 					ImGui::EndChild();
 					
 					/// Local Playstation host
