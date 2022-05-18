@@ -285,7 +285,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	main_config.append("/.config/Chiaki/Chiaki_rpi.conf");
 	settings = new RpiSettings();
 	settings->all_read_settings = settings->ReadSettingsYaml(main_config);
-	gui_settings_ptr = &settings->all_read_settings.at(0);	/// just to have some refrence connected
+	//gui_settings_ptr = &settings->all_read_settings.at(0);	/// just to have some refrence connected
 	
 	host->StartDiscoveryService();
 
@@ -583,6 +583,9 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 {	
 	std::string setting;
 	
+	if(gui_settings_ptr == nullptr)
+		return;
+	
 	if(widgetID == 1)
 	for(std::string ch : decoder_options) {
 		if(choice == ch) {
@@ -820,16 +823,19 @@ void ImguiSdlWindow::CreateImguiWidgets()
 							if (ImGui::Button("Find Remote", ImVec2(160, 30))) {
 									
 									host->discoveredRemoteMatched = false;
-									host->DiscoverRemote();
 									
-									/// all this to save current gui IP
-									host->current_remote_settings.remote_ip = GetIpAddr();
-									RpiSettings tmpsettings;
-									std::vector<rpi_settings_host> tmpRemoteSettings;
-									tmpRemoteSettings.push_back(host->current_remote_settings);
-									std::string remoteFile = home_dir;
-									remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
-									tmpsettings.WriteYaml(tmpRemoteSettings, remoteFile);
+									if(sel_remote != "no remotes") {
+										host->DiscoverRemote();
+										
+										/// all this to save current gui IP
+										host->current_remote_settings.remote_ip = GetIpAddr();
+										RpiSettings tmpsettings;
+										std::vector<rpi_settings_host> tmpRemoteSettings;
+										tmpRemoteSettings.push_back(host->current_remote_settings);
+										std::string remoteFile = home_dir;
+										remoteFile.append(std::string("/.config/Chiaki/") + sel_remote + std::string(".remote"));
+										tmpsettings.WriteYaml(tmpRemoteSettings, remoteFile);
+									}
 							}
 						} else {
 							std::string waittxt("    Please Wait ");

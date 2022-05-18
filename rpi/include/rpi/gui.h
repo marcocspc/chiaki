@@ -134,6 +134,7 @@ class ImguiSdlWindow
 		void HandleSDLEvents();
 		void ToggleFullscreen();
 		std::string GetIpAddr();
+		void RefreshReadBg();
 		
 		/// Imgui things
 		void SettingsDraw(int widgetID, const char* label, std::vector<std::string> list, std::string &select);
@@ -167,7 +168,7 @@ class ImguiSdlWindow
 		int dspszY = 0;
 		int settingIndent = 0;
 		int currentSettingsId = 20;	/// 20=local, 21=remote
-		rpi_settings_host *gui_settings_ptr;
+		rpi_settings_host *gui_settings_ptr = nullptr;
 		
 		bool open_regist = false;
 		std::string regist_acc_id;
