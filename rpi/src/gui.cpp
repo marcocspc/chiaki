@@ -285,8 +285,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	main_config.append("/.config/Chiaki/Chiaki_rpi.conf");
 	settings = new RpiSettings();
 	settings->all_read_settings = settings->ReadSettingsYaml(main_config);
-	//gui_settings_ptr = &settings->all_read_settings.at(0);	/// just to have some refrence connected
-	
+
 	host->StartDiscoveryService();
 
 	/// Imgui
@@ -552,8 +551,10 @@ void ImguiSdlWindow::SwitchSettings(int id)
 		currentSettingsId = id;
 		
 		if(currentSettingsId == 20) {	/// local host 0
-			gui_settings_ptr = &settings->all_validated_settings.at(0);
-			UpdateSettingsGui();
+			if(settings->all_validated_settings.size() > 0 ) {
+				gui_settings_ptr = &settings->all_validated_settings.at(0);
+				UpdateSettingsGui();
+			} else gui_settings_ptr = nullptr;
 			///printf("Switched to Local Settings\n");
 		}
 		if(currentSettingsId == 21) {	/// remote host 0
@@ -569,7 +570,10 @@ void ImguiSdlWindow::SwitchSettings(int id)
 
 /// changes what's seen in the gui
 void ImguiSdlWindow::UpdateSettingsGui()
-{
+{	
+	if(gui_settings_ptr == nullptr)
+		return;
+		
 	sel_decoder = gui_settings_ptr->sess.decoder;
 	sel_vcodec = gui_settings_ptr->sess.codec;
 	sel_resolution = gui_settings_ptr->sess.resolution;
