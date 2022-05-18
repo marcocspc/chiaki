@@ -184,14 +184,21 @@ void RpiSettings::RefreshSettings(rpi_settings_host settings_host, std::string s
 	//~ } ChiakiCodec;
 ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice, bool isPS5)
 {			
-	if(choice == "automatic" && isPS5)
+	/// check if hevc/h265 decoder is available
+	bool hasHEVC = false;
+	FILE *f;
+	f = fopen("/dev/video19", "r");
+	if(f != NULL) hasHEVC = true;
+	fclose(f);
+
+	if(choice == "automatic" && isPS5 && hasHEVC)
 		return CHIAKI_CODEC_H265;
 	else if(choice == "automatic")
 		return CHIAKI_CODEC_H264;
 
 	if(choice == "h264") return CHIAKI_CODEC_H264;
 
-	if(choice == "h265" && isPS5) return CHIAKI_CODEC_H265;
+	if(choice == "h265" && isPS5 && hasHEVC) return CHIAKI_CODEC_H265;
 	else return CHIAKI_CODEC_H264;
 }
 

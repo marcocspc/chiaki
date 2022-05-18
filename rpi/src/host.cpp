@@ -47,7 +47,7 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 			rpi_settings_host new_host;
 			new_host.sess.decoder = "automatic";
 			new_host.sess.codec = "automatic";
-			new_host.sess.resolution = "1080";
+			new_host.sess.resolution = "720";
 			new_host.sess.fps = "60";
 			new_host.sess.audio_device = "hdmi";
 			int ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(dh));//ChiakiDiscoveryHost

@@ -303,7 +303,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	sel_vcodec = vcodec_options[0];
 	
 	resolution_options = {"1080", "720", "540"};
-	sel_resolution = resolution_options[0];
+	sel_resolution = resolution_options[1];
 	
 	framerate_options = {"60", "30"};
 	sel_framerate = framerate_options[0];
