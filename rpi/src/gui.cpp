@@ -263,7 +263,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	sdl_renderer = renderer;
 	gl_ctx = gl_context;
 	
-	if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0)///0 is match
+	if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0 ||  std::strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0 )///0 is match
 		 IsX11 = true;
 	else IsX11 = false;
 	printf("Running under X11: %d\n", IsX11);

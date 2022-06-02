@@ -89,6 +89,18 @@ struct SDL_SysWMinfo
 		} kmsdrm;
 //#endif
 
+//#if defined(SDL_VIDEO_DRIVER_WAYLAND)
+        struct
+        {
+            struct wl_display *display;             /**< Wayland display */
+            struct wl_surface *surface;             /**< Wayland surface */
+            void *shell_surface;                    /**< DEPRECATED Wayland shell_surface (window manager handle) */
+            struct wl_egl_window *egl_window;       /**< Wayland EGL window (native window) */
+            struct xdg_surface *xdg_surface;        /**< Wayland xdg surface (window manager handle) */
+            struct xdg_toplevel *xdg_toplevel;      /**< Wayland xdg toplevel role */
+        } wl;
+//#endif
+
 		/* Make sure this union is always 64 bytes (8 64-bit pointers). */
 		/* Be careful not to overflow this if you add a new target! */
 		Uint8 dummy[64];
