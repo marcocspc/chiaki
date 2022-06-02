@@ -39,6 +39,10 @@ using std::endl;
 extern "C" {
 #endif
 
+/// these two added for Ubuntu
+#include <X11/Xlib.h>   //->  /usr/include/X11/Xlib.h
+#include <X11/Xatom.h>  //->  /usr/include/X11/Xatom.h
+
 #include "SDL_stdinc.h"
 #include "SDL_error.h"
 #include "SDL_video.h"
