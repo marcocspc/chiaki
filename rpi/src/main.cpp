@@ -54,7 +54,7 @@ int main()
 	int screen_height = 720;
 	
 	bool IsX11 = true;
-    if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0)///0 is match
+    if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0 || std::strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0)///0 is match
 		 IsX11 = true;
 	else IsX11 = false;
 	
@@ -128,10 +128,10 @@ int main()
 	//~ }
 	
 	/// Having this here makes work ok in X11...
-	if(IsX11) {
-		gl_context = SDL_GL_CreateContext(sdl_window);
-		SDL_GL_MakeCurrent(sdl_window, gl_context);
-	}
+	//~ if(IsX11) {
+		//~ gl_context = SDL_GL_CreateContext(sdl_window);
+		//~ SDL_GL_MakeCurrent(sdl_window, gl_context);
+	//~ }
 
 	SDL_Renderer* sdl_renderer = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
 	if(sdl_renderer==NULL){
