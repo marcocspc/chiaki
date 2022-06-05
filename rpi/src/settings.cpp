@@ -188,8 +188,10 @@ ChiakiCodec RpiSettings::GetChiakiCodec(std::string choice, bool isPS5)
 	bool hasHEVC = false;
 	FILE *f;
 	f = fopen("/dev/video19", "r");
-	if(f != NULL) hasHEVC = true;
-	fclose(f);
+	if(f != NULL) {
+		hasHEVC = true;
+		fclose(f);
+	}
 
 	if(choice == "automatic" && isPS5 && hasHEVC)
 		return CHIAKI_CODEC_H265;
