@@ -60,6 +60,7 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 			
 			host->gui->settings->all_validated_settings.push_back(new_host);
 			host->gui->settings->WriteYaml(host->gui->settings->all_validated_settings, std::string(host->gui->home_dir + "/.config/Chiaki/Chiaki_rpi.conf"));
+			host->gui->settings->all_read_settings = host->gui->settings->ReadSettingsYaml(host->gui->main_config);
 			
 			// Not correct! Needs to be Discovered's state
 			host->gui->setClientState(std::string("ready"));
