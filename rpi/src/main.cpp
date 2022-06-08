@@ -34,6 +34,15 @@ int main()
 	readlink("/proc/self/exe", pathbuf, bufsize);
 	printf ("Linux base Path:  %s\n", pathbuf);
 	
+	/// Test for existing h265/hevc decoder device
+	FILE *f;
+	f = fopen("/dev/video19", "r");
+	if(f != NULL) {
+		fclose(f);
+	} else {
+		printf("WARNING:  h265 Decoder Not Detected\n");
+	}
+	
 	SDL_version linked;
 	SDL_GetVersion(&linked);
 	printf("SDL version linked: %d.%d.%d\n", linked.major, linked.minor, linked.patch);
