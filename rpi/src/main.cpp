@@ -39,6 +39,7 @@ int main()
 	f = fopen("/dev/video19", "r");
 	if(f != NULL) {
 		fclose(f);
+		printf("h265 Hardware Decoder Detected\n");
 	} else {
 		printf("WARNING:  h265 Decoder Not Detected\n");
 	}
@@ -80,7 +81,7 @@ int main()
 			screen_height = sdl_top_mode.h;
 		}
 		
-		printf("Disp Mode: \t%dx%dpx @ %dhz \n", sdl_top_mode.w, sdl_top_mode.h, sdl_top_mode.refresh_rate);
+		printf("Disp Mode: %dx%d @ %dhz \n", sdl_top_mode.w, sdl_top_mode.h, sdl_top_mode.refresh_rate);
 	}
 	
     /// Create an application window with the following settings:
