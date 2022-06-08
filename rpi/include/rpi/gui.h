@@ -183,7 +183,7 @@ class ImguiSdlWindow
 		int dspszX = 0;
 		int dspszY = 0;
 		int settingIndent = 0;
-		int currentSettingsId = 20;	/// 20=local, 21=remote
+		int currentSettingsId = 0;	/// 0=init value, 20=local, 21=remote
 		rpi_settings_host *gui_settings_ptr = nullptr;
 		
 		bool open_regist = false;

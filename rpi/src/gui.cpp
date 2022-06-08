@@ -317,7 +317,6 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	sel_audio = audio_options[0];
 	// -----------------------------------------------------------------
 
-
 	/// Setup Platform/Renderer backends
 	ImGui_ImplSDL2_InitForOpenGL(sdl_window, *gl_ctx);
 	///const char* glsl_version = "#version 300 es"; //was: 100
@@ -433,6 +432,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	timestamp_sec_a -= 11; /// substract 11 sec to enable at startup
 	
 	//InitVideoGl(); // not sure if I should keep here
+	SwitchSettings(20);		/// Set to Local settings first instance [0]
 	
 
 	printf("Gui init done\n");
@@ -564,6 +564,9 @@ void ImguiSdlWindow::SwitchSettings(int id)
 		}		
 	}
 	
+	if(gui_settings_ptr == nullptr)
+		printf("ERROR: gui_settings_ptr == nullptr\n");
+	
 	///printf("apa");
 }
 
@@ -587,8 +590,10 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 {	
 	std::string setting;
 	
-	if(gui_settings_ptr == nullptr)
+	if(gui_settings_ptr == nullptr){
+		printf("Bad gui_settings_ptr\n");
 		return;
+	}
 	
 	if(widgetID == 1)
 	for(std::string ch : decoder_options) {
