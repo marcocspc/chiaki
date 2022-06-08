@@ -325,13 +325,15 @@ void RpiSettings::WriteYaml(std::vector<rpi_settings_host> all_host_settings, st
 	std::string homedir("/home/");
 	homedir.append(getenv("USER"));
 
-	/// check if directories exist, if not - create it
+	/// check if Chiaki config directory exist, if not - create it
+	/// Warning: I am not actually checking the path of the given filename
+	std::string configDir = homedir + "/.config/Chiaki";
 	struct stat sb;
-	if ( (stat(homedir.c_str(), &sb) != 0) || !S_ISDIR(sb.st_mode)) {
-		ret = mkdir(homedir.c_str(), 0777);
+	if ( (stat(configDir.c_str(), &sb) != 0) || !S_ISDIR(sb.st_mode)) {
+		ret = mkdir(configDir.c_str(), 0777);
         if(ret)  printf("Error creating .config/Chiaki directory\n");
     }
-		
+
 	ofstream out(filename);
 	if (!out.is_open()) {
 		printf("Could not open config file for writing: %s\n", filename.c_str());

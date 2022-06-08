@@ -38,7 +38,7 @@ std::vector<std::string> GetFiles(const char* folderPath, const char* match)
   
     if (dr == NULL)
     {
-        printf("Could not open current directory" );
+        printf("Could not open directory: %s\n", folderPath );
         return outFileNames;
     }
   
@@ -557,16 +557,13 @@ void ImguiSdlWindow::SwitchSettings(int id)
 			} else gui_settings_ptr = nullptr;
 			///printf("Switched to Local Settings\n");
 		}
+		
 		if(currentSettingsId == 21) {	/// remote host 0
 			gui_settings_ptr = &host->current_remote_settings;
 			UpdateSettingsGui();
 			///printf("Switched to Remote Settings\n");
 		}		
-	}
-	
-	if(gui_settings_ptr == nullptr)
-		printf("ERROR: gui_settings_ptr == nullptr\n");
-	
+	}	
 	///printf("apa");
 }
 
@@ -574,8 +571,10 @@ void ImguiSdlWindow::SwitchSettings(int id)
 /// changes what's seen in the gui
 void ImguiSdlWindow::UpdateSettingsGui()
 {	
-	if(gui_settings_ptr == nullptr)
+	if(gui_settings_ptr == nullptr){
+		printf("Warning: empty gui_settings_ptr\n");
 		return;
+	}
 		
 	sel_decoder = gui_settings_ptr->sess.decoder;
 	sel_vcodec = gui_settings_ptr->sess.codec;
@@ -591,7 +590,7 @@ void ImguiSdlWindow::ChangeSettingAction(int widgetID, std::string choice)
 	std::string setting;
 	
 	if(gui_settings_ptr == nullptr){
-		printf("Bad gui_settings_ptr\n");
+		printf("Warning: empty gui_settings_ptr\n");
 		return;
 	}
 	

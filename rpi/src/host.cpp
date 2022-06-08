@@ -49,7 +49,7 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 			new_host.sess.codec = "automatic";
 			new_host.sess.resolution = "720";
 			new_host.sess.fps = "60";
-			new_host.sess.audio_device = "hdmi";
+			new_host.sess.audio_device = "";
 			int ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(dh));//ChiakiDiscoveryHost
 			new_host.isPS5 = std::to_string(ps5);
 			new_host.nick_name = dh->host_name;
@@ -63,6 +63,10 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 			
 			// Not correct! Needs to be Discovered's state
 			host->gui->setClientState(std::string("ready"));
+			host->gui->currentSettingsId=0;/// workaround for below
+			host->gui->SwitchSettings(20);
+			/// update host settings gui
+			host->gui->UpdateSettingsGui();
 			printf("Registration Success!!\n");
 			break;
 	}
@@ -120,6 +124,8 @@ static void rem_discovery_cb(ChiakiDiscoveryHost *discovery_host, void *user)
 			{
 				host->discoveredRemoteMatched = true;
 				host->gui->SwitchRemoteImage(host->remote_state, isPS5_);
+				host->gui->currentSettingsId=0;/// workaround for below
+				host->gui->SwitchSettings(21);
 			}
 		}
 	}
@@ -190,6 +196,8 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 						/// copy this read-host to the active host list
 						// lets do this with a checking function to not double up or append existing data
 						host->gui->settings->all_validated_settings.push_back(sh);
+						host->gui->currentSettingsId=0;/// workaround for below
+						host->gui->SwitchSettings(20);
 						/// update host settings gui
 						host->gui->UpdateSettingsGui();
 						
