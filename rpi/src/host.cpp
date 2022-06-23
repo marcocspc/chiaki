@@ -508,6 +508,9 @@ int Host::StartSession()
 	connect_info.video_profile_auto_downgrade = false;
 	connect_info.enable_keyboard = false;
 	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(session_settings.sess.codec, stoi(session_settings.isPS5));
+	if(connect_info.video_profile.codec == CHIAKI_CODEC_H264) printf("Requesting codec: h264\n");
+	if(connect_info.video_profile.codec == CHIAKI_CODEC_H265) printf("Requesting codec: h265\n");
+	if(connect_info.video_profile.codec == CHIAKI_CODEC_H265_HDR) printf("Requesting codec: h265HDR\n");
 	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(session_settings.sess.resolution, stoi(session_settings.isPS5));
 	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(session_settings.sess.fps);
 	chiaki_connect_video_profile_preset(&connect_info.video_profile, resolution_preset, fps_preset);
