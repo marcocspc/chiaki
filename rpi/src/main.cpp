@@ -1,6 +1,9 @@
 #include <iostream>
 #include <stdio.h>
 #include <string.h>
+#include <cstring>
+
+#include <X11/Xlib.h>	/// for x11 check
 
 ///RPI
 #include "rpi/gui.h"	/// has SDL2 includes
@@ -58,16 +61,29 @@ int main()
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);//was: 8, try 0
 	///SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);//test
 	
-	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+	///SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+	if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) != 0) {
+        SDL_Log("Unable to initialize SDL- %s", SDL_GetError());
+        return 1;
+    }
 	
 	int screen_width = 1280;
 	int screen_height = 720;
 	
-	bool IsX11 = true;
-    if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0 || std::strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0)///0 is match
-		 IsX11 = true;
-	else IsX11 = false;
-	
+	bool IsX11 = false;
+	const char* curVidDrvr = SDL_GetCurrentVideoDriver();
+	if(curVidDrvr != NULL) {
+
+		if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0 || std::strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0)///0 is match
+			 IsX11 = true;
+		else IsX11 = false;
+	} else {
+		///SDL function might have failed so doubling up
+		printf("SDL_GetCurrentVideoDriver returned NULL\n");
+		IsX11 = XOpenDisplay(NULL) ? true : false;
+	}
+	printf("Running in Desktop mode:  %d\n", IsX11);
+			
 	/// Seems Mode 0 is the best one in my case.
 	/// More here:  https://wiki.libsdl.org/CategoryVideo
 	/// First one X11:   INFO: Mode 0	bpp 24	SDL_PIXELFORMAT_RGB888		1920 x 1200
@@ -82,6 +98,16 @@ int main()
 		}
 		
 		printf("Disp Mode: %dx%d @ %dhz \n", sdl_top_mode.w, sdl_top_mode.h, sdl_top_mode.refresh_rate);
+	} else {
+		printf("Error with SDL_GetDisplayMode\n");
+	}
+	
+	// something wrong with audio too!!?!?!
+	int i, count = SDL_GetNumAudioDevices(0);
+	printf("AUDIO DEVICE COUNT:  %d\n", count);
+	for (i = 0; i < count; ++i) {
+		//audio_out_devices.push_back(SDL_GetAudioDeviceName(i, 0));
+		SDL_Log("Audio device %d: %s", i, SDL_GetAudioDeviceName(i, 0));
 	}
 	
     /// Create an application window with the following settings:
@@ -165,7 +191,7 @@ int main()
 	
 			
 	/// GUI start
-	ImguiSdlWindow *screen = new ImguiSdlWindow(pathbuf, sdl_window, screen_width, screen_height, sdl_renderer, &gl_context);
+	ImguiSdlWindow *screen = new ImguiSdlWindow(pathbuf, sdl_window, screen_width, screen_height, sdl_renderer, &gl_context, IsX11);
 	screen->start();
 	//while(1) sleep(0.1);
 	
