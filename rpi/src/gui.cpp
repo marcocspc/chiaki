@@ -257,16 +257,17 @@ static EGLint texgen_attrs[] = {
    EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT,
 };
 
-ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* renderer, SDL_GLContext* gl_context)
+ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* renderer, SDL_GLContext* gl_context, bool isX11)
 {
 	sdl_window = pwindow;
 	sdl_renderer = renderer;
 	gl_ctx = gl_context;
+	IsX11 = isX11;
 	
-	if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0 ||  std::strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0 )///0 is match
-		 IsX11 = true;
-	else IsX11 = false;
-	printf("Running under X11: %d\n", IsX11);
+	//~ if(std::strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0 ||  std::strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0 )///0 is match
+		 //~ IsX11 = true;
+	//~ else IsX11 = false;
+	//~ printf("Running under X11: %d\n", IsX11);
 	
 	/// establish user home dir
 	home_dir = std::string("/home/");
@@ -292,8 +293,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
-	
-	
+
 	// settings options - THESE ARE THE ACTUAL SETTINGS SO DON'T CHANGE THE STRINGS.
 	// -----------------------------------------------------------------
 	decoder_options = {"automatic", "v4l2"};  /// doesn't like "-" symbols.
@@ -310,6 +310,7 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	
 	///audio_options = {"hdmi" ,"jack"};
 	///audio_options = {"default"};
+
 	// Audio logic is pretty rough, needs fixing up
 	for(std::string out_dev : io->audio_out_devices){
 		audio_options.push_back(out_dev);
@@ -319,9 +320,11 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 
 	/// Setup Platform/Renderer backends
 	ImGui_ImplSDL2_InitForOpenGL(sdl_window, *gl_ctx);
+
 	///const char* glsl_version = "#version 300 es"; //was: 100
 	const char* glsl_version = "#version 100";
 	ImGui_ImplOpenGL3_Init(glsl_version);
+
 	printf("GL_VERSION  : %s\n", glGetString(GL_VERSION) );
 	printf("GL_RENDERER : %s\n", glGetString(GL_RENDERER) );
 

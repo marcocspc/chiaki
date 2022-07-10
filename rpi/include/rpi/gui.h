@@ -124,7 +124,7 @@ class IO;
 class ImguiSdlWindow
 {
 	public:
-		ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* sdl_renderer, SDL_GLContext* gl_context);
+		ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, int rheight, SDL_Renderer* sdl_renderer, SDL_GLContext* gl_context, bool isX11);
 		~ImguiSdlWindow();
 		Host *host = nullptr; 	/// controller state, session
 		IO *io = nullptr;	    /// input, decode, rendering, audio
@@ -194,10 +194,10 @@ class ImguiSdlWindow
 		SDL_GLContext *gl_ctx;
 		SDL_Window *sdl_window = nullptr; 
 		SDL_Renderer *sdl_renderer = nullptr;
+		bool IsX11 = false;
 		EGLDisplay egl_display;
 		bool planes_init_done = false;
 		EGLint attribs[50];
-		bool IsX11 = false;
 		bool takeInput=1;
 		int clear_counter = 0;
 		time_t timestamp_sec_a;
