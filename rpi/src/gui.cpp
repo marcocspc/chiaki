@@ -471,9 +471,18 @@ void ImguiSdlWindow::SettingsDraw(int widgetID, const char* label, std::vector<s
 		{   
 			for (uint8_t i = 0; i < list.size(); i++)
 				if (ImGui::Selectable(list.at(i).c_str() )){
+					
+					// hack to re-focus outer button widget
+					if(!(select == list.at(i))) {
+						ImGuiIO &imio = ImGui::GetIO();
+						imio.AddKeyEvent(ImGuiKey_RightArrow, true);
+						imio.AddKeyEvent(ImGuiKey_RightArrow, false);
+					}
+					
 					select = list.at(i);
 					// need to refresh settings in memory (which also writes to file)
 					ChangeSettingAction(widgetID, select);
+
 				}
 			ImGui::EndPopup();
 		}
@@ -803,6 +812,14 @@ void ImguiSdlWindow::CreateImguiWidgets()
 							{   
 									for (uint8_t i = 0; i < remoteHostFiles.size(); i++)
 										if (ImGui::Selectable(remoteHostFiles.at(i).c_str() )){
+											
+											// hack to re-focus outer button widget
+											if(!(sel_remote == remoteHostFiles.at(i))) {
+												ImGuiIO &imio = ImGui::GetIO();
+												imio.AddKeyEvent(ImGuiKey_RightArrow, true);
+												imio.AddKeyEvent(ImGuiKey_RightArrow, false);
+											}
+											
 											sel_remote = remoteHostFiles.at(i);
 											
 											std::string remoteFile = home_dir;
