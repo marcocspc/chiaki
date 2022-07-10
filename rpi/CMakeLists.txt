@@ -52,5 +52,5 @@ add_executable(chiaki-rpi
 
 
 # -lEGS makes it build, but is that the right one or can SDL provide?
-target_link_libraries(chiaki-rpi chiaki-lib ${FFMPEG_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2TTF_LIBRARY} ${SDL2IMAGE_LIBRARY} setsu -ldrm -lGLESv2 -lEGL)
+target_link_libraries(chiaki-rpi chiaki-lib ${FFMPEG_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2TTF_LIBRARY} ${SDL2IMAGE_LIBRARY} setsu -ldrm -lGLESv2 -lEGL -lX11)
 #find DependInfo.cmake  for clues!
