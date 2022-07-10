@@ -106,7 +106,7 @@ int main()
 	int i, count = SDL_GetNumAudioDevices(0);
 	printf("AUDIO DEVICE COUNT:  %d\n", count);
 	for (i = 0; i < count; ++i) {
-		audio_out_devices.push_back(SDL_GetAudioDeviceName(i, 0));
+		///audio_out_devices.push_back(SDL_GetAudioDeviceName(i, 0));
 		SDL_Log("Audio device %d: %s", i, SDL_GetAudioDeviceName(i, 0));
 	}
 	
