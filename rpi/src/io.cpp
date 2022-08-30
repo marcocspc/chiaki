@@ -55,7 +55,20 @@ void AVFramesList::FreeLatest()
 	av_frame_free(&frameslist[current]);
 }
 
+static AVBufferRef *hw_device_ctx = NULL;
+static int hw_decoder_init(AVCodecContext *ctx, const enum AVHWDeviceType type)
+{
+    int err = 0;
 
+    if ((err = av_hwdevice_ctx_create(&hw_device_ctx, type,
+                                      NULL, NULL, 0)) < 0) {
+        fprintf(stderr, "Failed to create specified HW device.\n");
+        return err;
+    }
+    ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+
+    return err;
+}
 
 static void SessionSetsuCb(SetsuEvent *event, void *user);
 static void SessionSetsuCb(SetsuEvent *event, void *user)
@@ -487,7 +500,14 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 	codec_context->pix_fmt = AV_PIX_FMT_DRM_PRIME;  /// request a DRM frame
 	
 	// test
-	codec_context->thread_count = 1;
+	//codec_context->thread_count = 1;
+
+	if(stoi(host->session_settings.isPS5)) {
+		if (hw_decoder_init(codec_context, type) < 0) {
+			printf("Failed hw_decoder_init\n");
+			return -1;
+		}
+	}
 
 	if (avcodec_open2(codec_context, av_codec, nullptr) < 0) {
 		printf("Could not open codec\n");
@@ -519,8 +539,9 @@ int IO::FiniFFmpeg()
 {
 	avcodec_close(codec_context);
 	avcodec_free_context(&codec_context);
-	//if(decoder->hw_device_ctx)
-	//	av_buffer_unref(&decoder->hw_device_ctx);
+	// below might cause segfault?
+	if(hw_device_ctx)
+		av_buffer_unref(&hw_device_ctx);
 	return 1;
 }
 

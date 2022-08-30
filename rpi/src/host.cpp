@@ -148,7 +148,7 @@ static void EventCB(ChiakiEvent *event, void *user)
 //static void DiscoveryServiceHostsCallback(ChiakiDiscoveryHost *hosts, size_t hosts_count, void *user);
 
 
-// NEEDS FIXING UP FOR MULTIPLE HOSTS, PS5's
+// NEEDS FIXING UP FOR MULTIPLE HOSTS
 //
 /// triggers both on initial discovery and comeback after wakeup signal.
 static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count, void *);
@@ -284,14 +284,14 @@ int Host::Init(IO *io)
 
 int Host::StartDiscoveryService()
 {
-	//typedef void (*ChiakiDiscoveryServiceCb)(ChiakiDiscoveryHost *hosts, size_t hosts_count, void *user);
-	//discovery_cb = DiscoveryCB(void*);
+	///typedef void (*ChiakiDiscoveryServiceCb)(ChiakiDiscoveryHost *hosts, size_t hosts_count, void *user);
+	///discovery_cb = DiscoveryCB(void*);
 
 	ChiakiDiscoveryServiceOptions options;
 	options.ping_ms = PING_MS;
 	options.hosts_max = HOSTS_MAX;
 	options.host_drop_pings = DROP_PINGS;
-	options.cb = Discovery;		// type  ChiakiDiscoveryServiceCb
+	options.cb = Discovery;		/// type  ChiakiDiscoveryServiceCb
 	options.cb_user = this;		/// the Host
 	
 	service = new ChiakiDiscoveryService;
@@ -394,13 +394,6 @@ int Host::DiscoverRemote()
 }
 
 
-//~ void CheckSomething(unsigned int* count);
-//~ void CheckSomething(unsigned int* count)
-//~ {
-	//~ //Host* host = (Host*)user;
-//~ }
-
-
 int Host::WakeupRemote()
 {
 	const char *host_ip = gui->GetIpAddr().c_str();
@@ -449,8 +442,6 @@ void Host::RegistStart(std::string accountID, std::string pin)
 	regist_info.broadcast = false;
 	
 	chiaki_regist_start(&regist, &log, &regist_info, RegistEventCB, this);
-
-	//sleep(3); // Need 3 here. But shouldn't it have it's own thread??
 	
 	printf("END RegistClick\n");
 }
@@ -507,13 +498,13 @@ int Host::StartSession()
 	connect_info.ps5 = isPS5;
 	connect_info.video_profile_auto_downgrade = false;
 	connect_info.enable_keyboard = false;
+	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(session_settings.sess.resolution, stoi(session_settings.isPS5));
+	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(session_settings.sess.fps);
+	chiaki_connect_video_profile_preset(&connect_info.video_profile, resolution_preset, fps_preset);
 	connect_info.video_profile.codec = gui->settings->GetChiakiCodec(session_settings.sess.codec, stoi(session_settings.isPS5));
 	if(connect_info.video_profile.codec == CHIAKI_CODEC_H264) printf("Requesting codec: h264\n");
 	if(connect_info.video_profile.codec == CHIAKI_CODEC_H265) printf("Requesting codec: h265\n");
 	if(connect_info.video_profile.codec == CHIAKI_CODEC_H265_HDR) printf("Requesting codec: h265HDR\n");
-	ChiakiVideoResolutionPreset resolution_preset = gui->settings->GetChiakiResolution(session_settings.sess.resolution, stoi(session_settings.isPS5));
-	ChiakiVideoFPSPreset fps_preset = gui->settings->GetChiakiFps(session_settings.sess.fps);
-	chiaki_connect_video_profile_preset(&connect_info.video_profile, resolution_preset, fps_preset);
 	connect_info.video_profile.bitrate = 15000;
 
 	err = chiaki_session_init(&session, &connect_info, &log);
@@ -522,7 +513,7 @@ int Host::StartSession()
 		printf("Failed to init session\n");
 		return 1;
 	}
-	
+
 	chiaki_opus_decoder_set_cb(&opus_decoder, InitAudioCB, AudioCB, io);
 	chiaki_opus_decoder_get_sink(&opus_decoder, &audio_sink);
 	chiaki_session_set_audio_sink(&session, &audio_sink);
@@ -580,12 +571,6 @@ void Host::ConnectionEventCB(ChiakiEvent *event)
 
 	}
 }
-
-// Not used!?
-//~ void Host::DiscoveryCB(ChiakiDiscoveryHost *discovered_host)
-//~ {
-	//~ printf("In DiscoveryCB()========================================================\n");
-//~ }
 
 std::string Host::GetHostRPKey(uint8_t rp_key[])
 {
