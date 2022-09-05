@@ -589,7 +589,11 @@ bool IO::VideoCB(uint8_t *buf, size_t buf_size)
 				frames_list.Increment();/// increments 'current' for texture upload
 				nextFrameCount++;
 			} else {
-				///frames_list.Increment(); TEST
+				/// added these to try avoid glitching with 1080p
+				frames_list.Increment();
+				nextFrameCount++;
+				frame = frames_list.GetCurrentFrame();
+				
 				drmprime_out_display(dpo, frame); /// drm pipe
 			}
 			

@@ -696,7 +696,7 @@ bool ImguiSdlWindow::start()
 		
 		/// Wait for a fresh decoded frame
 		bool got_frame = false;
-		while(!got_frame && !guiActive)
+		while(!got_frame && !guiActive && IsX11)
 		{	
 			usleep(2000);  /// 2000 should be 2ms
 			/// maybe generate fresh frame texture for GL
