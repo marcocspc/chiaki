@@ -50,7 +50,8 @@ static void RegistEventCB(ChiakiRegistEvent *event, void *user)
 			new_host.sess.resolution = "720";
 			new_host.sess.fps = "60";
 			new_host.sess.audio_device = "";
-			int ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(dh));//ChiakiDiscoveryHost
+			// oldbroke int ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(dh));//ChiakiDiscoveryHost
+			int ps5 = chiaki_discovery_host_is_ps5(dh);
 			new_host.isPS5 = std::to_string(ps5);
 			new_host.nick_name = dh->host_name;
 			new_host.id = dh->host_id; /// mac
@@ -162,9 +163,15 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 	// Needs to be expanded to multi host
 	host->state = chiaki_discovery_host_state_string(discovered_hosts->state);
 	printf("Discovered Host State:  %s\n", host->state.c_str());
-
-	host->ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(discovered_hosts));
+	
+	// fails, not used in master 'gui' version
+	//host->ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(discovered_hosts));
 	//printf("Is PS5:  %d\n", host->ps5);
+	
+	// tmp fix
+	host->ps5 = chiaki_discovery_host_is_ps5(discovered_hosts);
+	printf("Is PS5:  %d\n", host->ps5);
+
 
 	/// If read settings are empty (so nothing was read from file earlier)
 	/// [N]
@@ -427,9 +434,20 @@ void Host::RegistStart(std::string accountID, std::string pin)
 			regist_info.psn_account_id, &accId_len);
 	if(err != CHIAKI_ERR_SUCCESS)
 		printf("Base64 decode of AccountID failed\n");
-
-	regist_info.target = chiaki_discovery_host_system_version_target(discoveredHosts);
-	printf("Regist Target:  %d\n", regist_info.target);
+	
+	//This will fail on PS5, not used in master 'gui' version
+	//regist_info.target = chiaki_discovery_host_system_version_target(discoveredHosts);
+	
+	// tmp fix - won't work with older PS4s
+	// florians version lets user set target system in the dialog.
+	if(ps5) {
+		regist_info.target = CHIAKI_TARGET_PS5_1;
+		printf("Attempt for PS5\n");
+	}
+	else {
+		regist_info.target = CHIAKI_TARGET_PS4_10;
+		printf("Attempt for PS4\n");
+	}
 	
 	regist_info.psn_online_id = nullptr; /// using regist_info.psn_account_id for higher targets
 	
