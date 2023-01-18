@@ -573,7 +573,7 @@ void Host::ConnectionEventCB(ChiakiEvent *event)
 				//~ this->chiaki_even_login_pin_request_cb(event->login_pin_request.pin_incorrect);
 			break;
 		case CHIAKI_EVENT_RUMBLE:
-			printf("ConnectionEventCB() CHIAKI_EVENT_RUMBLE\n");
+			///printf("ConnectionEventCB() CHIAKI_EVENT_RUMBLE\n");
 			//~ if(this->chiaki_event_rumble_cb != nullptr)
 			//~ this->chiaki_event_rumble_cb(event->rumble.left, event->rumble.right);
 			break;
