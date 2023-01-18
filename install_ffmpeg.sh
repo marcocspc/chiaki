@@ -9,14 +9,14 @@ read -r -p "Go ahead? [Y/n] " input
 
 case $input in
 	[yY][eE][sS]|[yY])
-	echo "Installing from https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.0.20.zip"
+	echo "Installing from https://github.com/jc-kynesim/rpi-ffmpeg.git"
 	echo ""
 	cd third-party/
 	sudo apt install build-essential
 	sudo apt install meson libepoxy-dev libxcb-dri3-dev libxcb1-dev libx11-dev libx11-xcb-dev libdrm-dev
 	sudo apt install libudev-dev
 	sudo apt install libglfw3-dev libgles2-mesa-dev libepoxy-dev
-	git clone --branch  test/4.3.2/rpi_main https://github.com/jc-kynesim/rpi-ffmpeg.git
+	git clone --branch  test/4.3.5/rpi_main https://github.com/jc-kynesim/rpi-ffmpeg.git
 	cd rpi-ffmpeg
 	export CPPFLAGS="-I/usr/include/libdrm"
 	./configure --enable-shared --disable-static --enable-sand --enable-v4l2-request --enable-libdrm --enable-libudev --enable-opengl --enable-epoxy --enable-vout-egl  --enable-vout-drm
