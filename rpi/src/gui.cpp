@@ -708,7 +708,6 @@ bool ImguiSdlWindow::start()
 			}
 		}
 		
-		
 		if(guiActive)
 			HandleSDLEvents();
 
@@ -754,7 +753,7 @@ void ImguiSdlWindow::CreateImguiWidgets()
 			///window_flags |= ImGuiWindowFlags_NoBackground;
 			window_flags |= ImGuiWindowFlags_NoResize;
 			window_flags |= ImGuiWindowFlags_NoMouseInputs;
-						
+												
 			dspszX = imio.DisplaySize.x;
 			dspszY = imio.DisplaySize.y;
 			float botHgt = 0.5;  /// fraction of total height
@@ -1136,11 +1135,15 @@ void ImguiSdlWindow::RefreshScreenDraw()
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	///glUseProgram(program);//not needed
-	if(!guiActive)
+	if(!guiActive) {
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		SDL_ShowCursor(0);
+	}
 
-	if(guiActive)
+	if(guiActive) {
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		SDL_ShowCursor(1);
+	}
 
 	///SDL_GL_SwapWindow(sdl_window);	// use below one?
 	SDL_RenderPresent(sdl_renderer);	///Waits for vsync, use for gl video 
