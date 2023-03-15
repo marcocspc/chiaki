@@ -445,7 +445,7 @@ void IO::ShutdownStreamDrm()
 int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 {	
 	///printf("Begin InitFFmpeg\n");
-	///av_log_set_level(AV_LOG_DEBUG);
+	///av_log_set_level(AV_LOG_TRACE);
 	
 	AVBufferRef * hw_device_ctx = nullptr;
 	const char *hw_decoder_name = "drm";
@@ -746,8 +746,8 @@ void IO::AudioCB(int16_t *buf, size_t samples_count)
 	}
 	
 	int audio_queued_size = SDL_GetQueuedAudioSize(this->sdl_audio_device_id);
-	if(audio_queued_size > 16000)
-	{
+	if(audio_queued_size > 32000)  ///was 16000
+	{	
 		// clear audio queue to avoid big audio delay
 		// average values are close to 13000 bytes
 		CHIAKI_LOGW(&log, "Triggering SDL_ClearQueuedAudio with queue size = %d", audio_queued_size);
