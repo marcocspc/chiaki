@@ -80,14 +80,6 @@ static void SessionSetsuCb(SetsuEvent *event, void *user)
 
 IO::IO()
 {
-	// maybe Ill have to do some timer thing to poll every now and then
-	audio_out_devices.clear();
-	int i, count = SDL_GetNumAudioDevices(0);
-	for (i = 0; i < count; ++i) {
-		audio_out_devices.push_back(SDL_GetAudioDeviceName(i, 0));
-		SDL_Log("Audio device %d: %s", i, SDL_GetAudioDeviceName(i, 0));
-	}
-	
 	/// Setsu - touchpad, rumble
 	setsu_motion_device = nullptr;
 	chiaki_controller_state_set_idle(&setsu_state);
@@ -229,7 +221,7 @@ void IO::HandleJoyEvent(void)
 					
 				case SDL_WINDOWEVENT:
 				{
-					if (event.window.event == SDL_WINDOWEVENT_RESIZED)
+					if (event.window.event == SDL_WINDOWEVENT_RESIZED || event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
 					{	
 						host->gui->resizeEvent(event.window.data1, event.window.data2);
 					}
@@ -695,7 +687,7 @@ void IO::InitAudioCB(unsigned int channels, unsigned int rate)
 	want.callback = NULL;
 	
 	std::string current_out_choice = host->session_settings.sess.audio_device;
-	//printf("Session Audio OUT:  %s\n", current_out_choice.c_str());
+	printf("Session Audio Out:  %s\n", current_out_choice.c_str());
 	
 	if(audio_out_devices.size() > 0)
 	{

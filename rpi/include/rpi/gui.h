@@ -151,6 +151,7 @@ class ImguiSdlWindow
 		void ToggleFullscreen();
 		std::string GetIpAddr();
 		void RefreshReadBg();
+		void RefreshAudioDevices();
 		
 		/// Imgui things
 		void SettingsDraw(int widgetID, const char* label, std::vector<std::string> list, std::string &select);

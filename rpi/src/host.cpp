@@ -126,6 +126,7 @@ static void rem_discovery_cb(ChiakiDiscoveryHost *discovery_host, void *user)
 			{
 				host->discoveredRemoteMatched = true;
 				host->gui->SwitchRemoteImage(host->remote_state, isPS5_);
+				//host->gui->RefreshAudioDevices();
 				host->gui->currentSettingsId=0;/// workaround for below
 				host->gui->SwitchSettings(21);
 			}
@@ -164,14 +165,8 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 	host->state = chiaki_discovery_host_state_string(discovered_hosts->state);
 	printf("Discovered Host State:  %s\n", host->state.c_str());
 	
-	// fails, not used in master 'gui' version
-	//host->ps5 = chiaki_target_is_ps5(chiaki_discovery_host_system_version_target(discovered_hosts));
-	//printf("Is PS5:  %d\n", host->ps5);
-	
-	// tmp fix
 	host->ps5 = chiaki_discovery_host_is_ps5(discovered_hosts);
 	printf("Is PS5:  %d\n", host->ps5);
-
 
 	/// If read settings are empty (so nothing was read from file earlier)
 	/// [N]
@@ -207,6 +202,7 @@ static void Discovery(ChiakiDiscoveryHost *discovered_hosts, size_t hosts_count,
 						host->gui->currentSettingsId=0;/// workaround for below
 						host->gui->SwitchSettings(20);
 						/// update host settings gui
+						host->gui->RefreshAudioDevices();
 						host->gui->UpdateSettingsGui();
 						
 					}

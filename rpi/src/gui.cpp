@@ -308,14 +308,16 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 	framerate_options = {"60", "30"};
 	sel_framerate = framerate_options[0];
 	
-	///audio_options = {"hdmi" ,"jack"};
-	///audio_options = {"default"};
-
+	
+	/// Audio device now searched and set from a gui function called in host Discovery().
+	/// IO is already created (searches hw audio devices)
+	//printf("JUST BEFORE AUDIO MENU SET\n");
 	// Audio logic is pretty rough, needs fixing up
-	for(std::string out_dev : io->audio_out_devices){
-		audio_options.push_back(out_dev);
-	}
-	sel_audio = audio_options[0];
+	//~ for(std::string out_dev : io->audio_out_devices){
+		//~ audio_options.push_back(out_dev);
+	//~ }
+	//~ sel_audio = audio_options[0];
+	/// DISCOVERY HOST VALIDATION HAPPENS AFTER  host->gui->settings->all_validated_settings
 	// -----------------------------------------------------------------
 
 	/// Setup Platform/Renderer backends
@@ -490,6 +492,45 @@ void ImguiSdlWindow::SettingsDraw(int widgetID, const char* label, std::vector<s
 	ImGui::PopStyleColor(nCols);
 	
 	if (ImGui::IsItemHovered()) SwitchHelpText(label);
+}
+
+/// curently triggered from host Discovery()
+// lets add to audio callback to bypass if no valid audio device engaged/set
+void ImguiSdlWindow::RefreshAudioDevices()
+{
+	///printf("RefreshAudioDevices();\n");
+	///previously in io create
+	io->audio_out_devices.clear();
+	int i, count = SDL_GetNumAudioDevices(0);
+	for (i = 0; i < count; ++i) {
+		io->audio_out_devices.push_back(SDL_GetAudioDeviceName(i, 0));
+		SDL_Log("Audio device %d: %s", i, SDL_GetAudioDeviceName(i, 0));
+	}
+	
+	bool matchFound=false;
+	audio_options.clear();
+	/// adding all found devides to gui options
+	for(std::string out_dev : io->audio_out_devices){
+		audio_options.push_back(out_dev);
+		
+		/// if a found device matches a saved one pick it
+		/// printf("%s\n", host->gui->settings->all_validated_settings.at(0).sess.audio_device.c_str());
+		std::string currSettingDevice = host->gui->settings->all_validated_settings.at(0).sess.audio_device;
+		if(out_dev == currSettingDevice) {
+			printf("Found matching audio device\n");
+			sel_audio = out_dev;
+			matchFound=true;
+		} 
+	}
+	
+	if(matchFound == false) {
+		printf("Stored Audio device selection not matching found ones. Selecting first found.\n");
+		sel_audio = io->audio_out_devices.at(0);		
+	}
+	
+	// refresh gui
+	ChangeSettingAction(5, sel_audio);	///5 is for audio menu
+	UpdateSettingsGui();
 }
 
 ///
@@ -1045,7 +1086,7 @@ void ImguiSdlWindow::HandleSDLEvents()
 		while (SDL_PollEvent(&event))
 		{
 			ImGui_ImplSDL2_ProcessEvent(&event);
-			
+
 			switch (event.type)
 			{
 				case SDL_QUIT:
@@ -1083,17 +1124,9 @@ void ImguiSdlWindow::HandleSDLEvents()
 						SDL_Quit();
 						exit(0);
 						break;
+						
 					  case SDLK_F11:
-						fullscreen = !fullscreen;
-						if (fullscreen)
-						{
-						  SDL_SetWindowFullscreen(sdl_window, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
-						  //SDL_SetWindowSize(sdl_window, 1920, 1080);
-						}
-						else
-						{
-						  SDL_SetWindowFullscreen(sdl_window, SDL_WINDOW_OPENGL);
-						}
+						host->gui->ToggleFullscreen();
 						break;
 						
 					  default:
@@ -1101,10 +1134,10 @@ void ImguiSdlWindow::HandleSDLEvents()
 					}
 					break;
 				}
-				
-				case SDL_WINDOWEVENT:
-				{
-					if (event.window.event == SDL_WINDOWEVENT_RESIZED)
+								
+				case SDL_WINDOWEVENT:	/// Does not trigger when in session/gl
+				{						
+					if (event.window.event == SDL_WINDOWEVENT_RESIZED || event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
 					{
 						resizeEvent(event.window.data1, event.window.data2);
 					}
@@ -1407,22 +1440,27 @@ void ImguiSdlWindow::restoreGui()
 }
 
 void ImguiSdlWindow::ToggleFullscreen()
-{
+{	
+	SDL_DisplayMode dm;
+	SDL_GetCurrentDisplayMode(0, &dm);
+	
 	fullscreen = !fullscreen;
 	if (fullscreen)
 	{
 	  SDL_SetWindowFullscreen(sdl_window, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
+	  resizeEvent(dm.w, dm.h);
 	}
 	else
 	{
 	  SDL_SetWindowFullscreen(sdl_window, SDL_WINDOW_OPENGL);
+	  resizeEvent(dm.w, dm.h);
 	}
 }
 
 /// Needs to trigger in session
 bool ImguiSdlWindow::resizeEvent(int w, int h)
 {	
-	//printf("New Window Size: %dx%d\n", w, h);
+	///printf("New Window Size: %dx%d\n", w, h);
 	
 	/// Calc values to use for GL render portal
 	GLsizei vp_width = 64;
