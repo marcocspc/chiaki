@@ -719,8 +719,8 @@ void IO::AudioCB(int16_t *buf, size_t samples_count)
 	
 	for(uint32_t x = 0; x < samples_count * 2; x++)
 	{
-		// boost audio volume
-		int sample = buf[x] * 1.80;
+		int sample = buf[x];
+		// int sample = buf[x] * 1.8;
 		// Hard clipping (audio compression)
 		// truncate value that overflow/underflow int16
 		if(sample > INT16_MAX)
@@ -740,6 +740,7 @@ void IO::AudioCB(int16_t *buf, size_t samples_count)
 	int audio_queued_size = SDL_GetQueuedAudioSize(this->sdl_audio_device_id);
 	if(audio_queued_size > 32000)  ///was 16000
 	{	
+		printf("Audio Buffer Large Warning\n");
 		// clear audio queue to avoid big audio delay
 		// average values are close to 13000 bytes
 		CHIAKI_LOGW(&log, "Triggering SDL_ClearQueuedAudio with queue size = %d", audio_queued_size);
@@ -747,8 +748,10 @@ void IO::AudioCB(int16_t *buf, size_t samples_count)
 	}
 
 	int success = SDL_QueueAudio(this->sdl_audio_device_id, buf, sizeof(int16_t) * samples_count * 2);
-	if(success != 0)
+	if(success != 0) {
 		CHIAKI_LOGE(&log, "SDL_QueueAudio failed: %s\n", SDL_GetError());
+		printf("SDL_QueueAudio Error\n");
+	}
 		
 	//printf("END IO::AudioCB\n");
 	return;
