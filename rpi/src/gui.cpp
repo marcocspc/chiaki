@@ -17,8 +17,10 @@
 #include <drm_fourcc.h>
 
 //this was needed due to av_frame_cropped_height error
-#include <libavutil/pixdesc.h>
-//#include "libavutil/pixdesc.h"
+#include "libavutil/frame.h"
+#include "libavutil/hwcontext.h"
+#include "libavutil/hwcontext_drm.h"
+#include "libavutil/pixdesc.h"
 
 
 int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
