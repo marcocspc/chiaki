@@ -37,6 +37,9 @@
 #include "libavutil/hwcontext_drm.h"
 #include "libavutil/pixdesc.h"
 
+//this was needed due to av_frame_cropped_height error
+#include "rpi/gui.h"
+//patch done
 
 #define TRACE_ALL 0
 
