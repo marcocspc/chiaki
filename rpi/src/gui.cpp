@@ -16,6 +16,9 @@
 
 #include <drm_fourcc.h>
 
+//this was needed due to av_frame_cropped_height error
+#include "rpi/custom.h"
+//patch done
 
 int RemapChi(int x, int in_min, int in_max, int out_min, int out_max)
 {	
