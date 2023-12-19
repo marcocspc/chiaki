@@ -353,7 +353,8 @@ ImguiSdlWindow::ImguiSdlWindow(char pathbuf[], SDL_Window* pwindow, int rwidth, 
 		mainpath += fullpathvec.at(i);
 	}
 	mainpath += "/rpi/assets/";
-	///printf("MAIN PATH:  %s\n", mainpath.c_str());
+    //I'll leave this here in order to check where should I put assets
+	printf("MAIN PATH:  %s\n", mainpath.c_str());
 
 	ImGuiIO &imio = ImGui::GetIO();
 	float size_pixels = 18;
