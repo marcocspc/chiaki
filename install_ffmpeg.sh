@@ -12,10 +12,10 @@ case $input in
 	echo "Installing from https://github.com/jc-kynesim/rpi-ffmpeg.git"
 	echo ""
 	cd third-party/
-	sudo apt install build-essential
-	sudo apt install meson libepoxy-dev libxcb-dri3-dev libxcb1-dev libx11-dev libx11-xcb-dev libdrm-dev
-	sudo apt install libudev-dev
-	sudo apt install libglfw3-dev libgles2-mesa-dev libepoxy-dev
+	sudo apt install -y build-essential
+	sudo apt install -y eson libepoxy-dev libxcb-dri3-dev libxcb1-dev libx11-dev libx11-xcb-dev libdrm-dev
+	sudo apt install -y ibudev-dev
+	sudo apt install -y ibglfw3-dev libgles2-mesa-dev libepoxy-dev
 	git clone --branch  test/4.3.5/rpi_main https://github.com/jc-kynesim/rpi-ffmpeg.git
 	cd rpi-ffmpeg
 	export CPPFLAGS="-I/usr/include/libdrm"

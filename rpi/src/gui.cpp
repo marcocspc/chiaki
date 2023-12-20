@@ -902,7 +902,7 @@ void ImguiSdlWindow::CreateImguiWidgets()
                                     //If the comparison is set to 'sel_remote != "no remotes"'
                                     //the host registration would always fail. Leaving the application
                                     //in a locked state.
-									if(sel_remote == "no remotes" && (client_state == "unknown" || client_state == "notreg")) {
+									if(sel_remote == "no remotes" || (client_state == "unknown" || client_state == "notreg")) {
 										host->DiscoverRemote();
 										
 										/// all this to save current gui IP
