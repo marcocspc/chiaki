@@ -23,6 +23,8 @@ RUN  apt-get install -y cmake \
                         libdrm-dev \
                         libgbm-dev
 
+RUN echo "start here"
+
 RUN  cd / &&  git clone --recursive --single-branch --branch rpi02 https://github.com/marcocspc/chiaki.git chiaki-rpi
 RUN  cd chiaki-rpi &&  echo y | ./install_sdl.sh 
 RUN  cd chiaki-rpi &&  echo y | ./install_ffmpeg.sh
