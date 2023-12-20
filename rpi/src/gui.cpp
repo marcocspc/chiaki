@@ -1403,7 +1403,7 @@ void ImguiSdlWindow::setClientState(std::string state)
 	/// printf("ImguiSdlWindow::setClientState now:  %s\n", state.c_str());
 	
 	if(state.empty())
-		client_state = std::string("unknown");
+		client_state = std::string("notreg");
 	else
 		client_state = state;
 	
