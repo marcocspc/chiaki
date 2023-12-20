@@ -896,7 +896,13 @@ void ImguiSdlWindow::CreateImguiWidgets()
 									
 									host->discoveredRemoteMatched = false;
 									
-									if(sel_remote != "no remotes") {
+                                    //I've changed this to ==, because if no remote
+                                    //file was created, the gui would set the button
+                                    //text to 'no remotes'.
+                                    //If the comparison is set to 'sel_remote != "no remotes"'
+                                    //the host registration would always fail. Leaving the application
+                                    //in a locked state.
+									if(sel_remote == "no remotes") {
 										host->DiscoverRemote();
 										
 										/// all this to save current gui IP
