@@ -7,7 +7,7 @@ else
     echo "docker found"
 fi
 
-docker build . -t chiaki
+docker build . -t chiaki 
 container=$(docker create chiaki)
 mkdir -p out
 docker cp $container:/app/chiaki-rpi ./out/
