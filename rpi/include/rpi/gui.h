@@ -233,7 +233,7 @@ class ImguiSdlWindow
 		bool done = false;		/// A Major on/off state
 		int guiActive=1;		/// main gui loop
 		int fullscreen=0;
-		std::string client_state = "unknown";	/// unknown, notreg, standby, waiting, ready, playing. For the button.
+		std::string client_state = "notreg";	/// unknown, notreg, standby, waiting, ready, playing. For the button.
 };
 
 
