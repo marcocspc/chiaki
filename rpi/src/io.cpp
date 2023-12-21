@@ -440,13 +440,12 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 	///av_log_set_level(AV_LOG_TRACE);
 	
 	AVBufferRef * hw_device_ctx = nullptr;
-	//const char *hw_decoder_name = "drm";
-	const char *hw_decoder_name = "egl";
+	const char *hw_decoder_name = "drm";
 	enum AVHWDeviceType type;
 	AVCodec *av_codec;
 	
-    //const char *codec_name = "h264_v4l2m2m";
-	const char *codec_name = "h264";
+    const char *codec_name = "h264_v4l2m2m";
+	//const char *codec_name = "h264";
 	ChiakiCodec chi_codec = host->gui->settings->GetChiakiCodec(host->session_settings.sess.codec, stoi(host->session_settings.isPS5));
 	if(chi_codec == CHIAKI_CODEC_H265)
 		codec_name = "hevc";
