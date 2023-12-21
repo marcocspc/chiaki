@@ -24,14 +24,14 @@ RUN  apt-get install -y cmake \
                         libgbm-dev
 
 
-RUN echo "start here 894"
 RUN  cd / &&  git clone --recursive --single-branch --branch rpi02 https://github.com/marcocspc/chiaki.git chiaki-rpi
 RUN  cd chiaki-rpi &&  echo y | ./install_sdl.sh 
+RUN  cd /chiaki-rpi &&  git pull
 RUN  cd chiaki-rpi &&  echo y | ./install_ffmpeg.sh
 
 #RUN rm -rf /chiaki-rpi
 #RUN  cd / &&  git clone --recursive --single-branch --branch rpi02 https://github.com/marcocspc/chiaki.git chiaki-rpi
-RUN  cd /chiaki-rpi &&  git pull
+RUN echo "start here 8945"
 RUN  mkdir /chiaki-rpi/build
 RUN  cd /chiaki-rpi/build &&  cmake ..
 RUN  cd /chiaki-rpi/build &&  make -j $(nproc)
