@@ -440,7 +440,8 @@ int IO::InitFFmpeg() // pass the drm_fd here maybe instead of back door?
 	///av_log_set_level(AV_LOG_TRACE);
 	
 	AVBufferRef * hw_device_ctx = nullptr;
-	const char *hw_decoder_name = "drm";
+	//const char *hw_decoder_name = "drm";
+	const char *hw_decoder_name = "egl";
 	enum AVHWDeviceType type;
 	AVCodec *av_codec;
 	
