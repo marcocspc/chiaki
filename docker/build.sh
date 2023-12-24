@@ -20,4 +20,8 @@ fi
 #docker cp $container:/app/chiaki-rpi ./out/
 #docker rm $container
 
-docker-compose run build-rk3566
+docker-compose build build-rk3566 --no-cache --progress=plain
+mkdir -p out
+container=$(docker-compose create build-rk3566)
+docker cp $container:/app/chiaki-rpi ./out/
+docker rm $container
