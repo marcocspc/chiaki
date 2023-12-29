@@ -1,20 +1,13 @@
 version: '3'
 
 services:
-    build-rk3566:
-        build:
-            context: .
-            dockerfile: ./Dockerfile.rk3566.arm64
-        image: rk3566
-        platform: linux/arm64/v8
-        volumes:
-            - ./out:/app
-        environment:
-            - "CHIAKI_REPO=https://github.com/marcocspc/chiaki"
-        command: "cd / && \
-             git clone --recursive --single-branch --branch rpi02 $CHIAKI_REPO chiaki-rpi && \
-             cd /chiaki-rpi/build && \
-             cmake .. && \
-             cd /chiaki-rpi/build &&  make -j $(nproc) && \
-             mv /chiaki-rpi/build/rpi/chiaki-rpi /app  
-             "
+  build-rk3566:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.rk3566.arm64
+    image: rk3566
+    platform: linux/arm64/v8
+    volumes:
+      - ./out:/app
+    environment:
+      - CHIAKI_REPO=https://github.com/marcocspc/chiaki

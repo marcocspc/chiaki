@@ -26,7 +26,17 @@ RUN  apt-get install -y cmake \
 
 RUN  cd / &&  git clone --recursive --single-branch --branch rpi02 https://github.com/marcocspc/chiaki.git chiaki-rpi
 RUN  cd chiaki-rpi &&  echo y | ./install_sdl.sh 
+
+RUN echo "start here 8945999"
+RUN  cd chiaki-rpi && git pull
 RUN  cd chiaki-rpi &&  echo y | ./install_ffmpeg.sh
 RUN find / -name ffmpeg
+
+RUN  mkdir /chiaki-rpi/build
+RUN  cd /chiaki-rpi/build &&  cmake ..
+RUN  cd /chiaki-rpi/build &&  make -j $(nproc)
+
+RUN  mkdir /app
+RUN  mv /chiaki-rpi/build/rpi/chiaki-rpi /app
 
 RUN  mkdir /app

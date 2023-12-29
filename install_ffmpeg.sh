@@ -13,10 +13,10 @@ case $input in
 	echo "Installing from https://github.com/hbiyik/FFmpeg"
 	echo ""
 	cd third-party/
-	sudo apt install -y build-essential 
-	sudo apt install -y meson libepoxy-dev libxcb-dri3-dev libxcb1-dev libx11-dev libx11-xcb-dev libdrm-dev
-	sudo apt install -y libudev-dev
-	sudo apt install -y libglfw3-dev libgles2-mesa-dev libepoxy-dev
+	sudo apt-get install -y build-essential 
+	sudo apt-get install -y meson libepoxy-dev libxcb-dri3-dev libxcb1-dev libx11-dev libx11-xcb-dev libdrm-dev
+	sudo apt-get install -y libudev-dev
+	sudo apt-get install -y libglfw3-dev libgles2-mesa-dev libepoxy-dev
 	#git clone --branch  test/4.3.5/rpi_main https://github.com/jc-kynesim/rpi-ffmpeg.git
 	git clone --branch  exp_refactor_all https://github.com/hbiyik/FFmpeg
 	cd FFmpeg

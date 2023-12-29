@@ -14,13 +14,7 @@ else
     echo "docker-compose found"
 fi
 
-#docker build . -t chiaki 
-#container=$(docker create chiaki)
-#mkdir -p out
-#docker cp $container:/app/chiaki-rpi ./out/
-#docker rm $container
-
-docker-compose build build-rk3566 --no-cache --progress=plain
+docker-compose build build-rk3566 --progress=plain
 mkdir -p out
 container=$(docker-compose create build-rk3566)
 docker cp $container:/app/chiaki-rpi ./out/
