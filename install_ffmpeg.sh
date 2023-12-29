@@ -22,8 +22,7 @@ case $input in
 	cd FFmpeg
 	export CPPFLAGS="-I/usr/include/libdrm"
 	#./configure --enable-shared --disable-static --enable-sand --enable-v4l2-request --enable-libdrm --enable-libudev --enable-opengl --enable-epoxy --enable-vout-egl  --enable-vout-drm
-    ./configure --enable-rkmpp --enable-version3 --enable-lib
-drm --enable-nonfree --enable-gpl --enable-version3 --enable-libx264 --enable-librtmp --enable-shared --enable-static --enable-libx265 --enable-libmp3lame --enable-libpulse --enable-openssl --enable-libopus --enable-libvorbis --enable-libaom --enable-libass --enable-libdav1d --enable-libx265 --enable-libvpx
+    ./configure --enable-rkmpp --enable-version3 --enable-libdrm --enable-nonfree --enable-gpl --enable-version3 --enable-libx264 --enable-librtmp --enable-shared --enable-static --enable-libx265 --enable-libmp3lame --enable-libpulse --enable-openssl --enable-libopus --enable-libvorbis --enable-libaom --enable-libass --enable-libdav1d --enable-libx265 --enable-libvpx
 	make -j3
 	sudo make install
 	echo ""
