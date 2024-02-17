@@ -9,8 +9,7 @@ read -r -p "Go ahead? [Y/n] " input
 
 case $input in
 	[yY][eE][sS]|[yY])
-	#echo "Installing from https://github.com/jc-kynesim/rpi-ffmpeg.git"
-	echo "Installing from https://github.com/hbiyik/FFmpeg"
+	echo "Installing from https://github.com/jernejsk/FFmpeg.git"
 	echo ""
 	cd third-party/
 	sudo apt-get install -y build-essential \
@@ -20,12 +19,10 @@ case $input in
                             libglfw3-dev libgles2-mesa-dev libepoxy-dev \
                             libaom-dev
 
-	#git clone --branch  test/4.3.5/rpi_main https://github.com/jc-kynesim/rpi-ffmpeg.git
-	git clone --branch  exp_refactor_all https://github.com/hbiyik/FFmpeg
+    git clone --branch  v4l2-request-n6.0 https://github.com/jernejsk/FFmpeg.git
 	cd FFmpeg
 	export CPPFLAGS="-I/usr/include/libdrm"
-	#./configure --enable-shared --disable-static --enable-sand --enable-v4l2-request --enable-libdrm --enable-libudev --enable-opengl --enable-epoxy --enable-vout-egl  --enable-vout-drm
-    ./configure --enable-rkmpp --enable-version3 --enable-libdrm --enable-nonfree --enable-gpl --enable-version3 --enable-libx264 --enable-librtmp --enable-shared --enable-static --enable-libx265 --enable-libmp3lame --enable-libpulse --enable-openssl --enable-libopus --enable-libvorbis --enable-libaom --enable-libass --enable-libdav1d --enable-libx265 --enable-libvpx
+    ./configure --enable-v4l2-request --enable-libudev --enable-libdrm --enable-gnutls 
     make -j $(nproc)
 	sudo make install
 	echo ""
