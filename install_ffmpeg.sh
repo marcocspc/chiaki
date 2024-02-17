@@ -9,7 +9,7 @@ read -r -p "Go ahead? [Y/n] " input
 
 case $input in
 	[yY][eE][sS]|[yY])
-	echo "Installing from https://github.com/jernejsk/FFmpeg.git"
+	echo "Installing from https://github.com/rsglobal/FFmpeg.git"
 	echo ""
 	cd third-party/
 	sudo apt-get install -y build-essential \
@@ -20,7 +20,7 @@ case $input in
                             libaom-dev \
                             libgnutls28-dev
 
-    git clone --branch  v4l2-request-n6.0 https://github.com/jernejsk/FFmpeg.git
+    git clone --branch fix-missing-include https://github.com/rsglobal/FFmpeg.git 
 	cd FFmpeg
 	export CPPFLAGS="-I/usr/include/libdrm"
     ./configure --enable-v4l2-request --enable-libudev --enable-libdrm --enable-gnutls 
