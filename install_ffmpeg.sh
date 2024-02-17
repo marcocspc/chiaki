@@ -17,7 +17,8 @@ case $input in
                             libudev-dev \
                             libglfw3-dev libgles2-mesa-dev libepoxy-dev \
                             libglfw3-dev libgles2-mesa-dev libepoxy-dev \
-                            libaom-dev
+                            libaom-dev \
+                            libunistring-dev
 
     git clone --branch  v4l2-request-n6.0 https://github.com/jernejsk/FFmpeg.git
 	cd FFmpeg
