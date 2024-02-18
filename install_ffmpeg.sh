@@ -20,7 +20,7 @@ case $input in
                             libaom-dev \
                             libgnutls28-dev
 
-    git clone --branch v4l2-request-hwaccel-4.4 https://github.com/faithanalog/FFmpeg-v4l2
+    git clone --branch v4l2-request-hwaccel-4.4 https://github.com/faithanalog/FFmpeg-v4l2 FFmpeg
 	cd FFmpeg
 	export CPPFLAGS="-I/usr/include/libdrm"
     ./configure --enable-v4l2-request --enable-libudev --enable-libdrm --enable-gnutls 
